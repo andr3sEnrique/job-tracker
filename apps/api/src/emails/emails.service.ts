@@ -145,6 +145,9 @@ export class EmailsService {
         orderBy: [{ receivedAt: 'desc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
+        include: {
+          application: { select: { roleTitle: true, company: { select: { name: true } } } },
+        },
       }),
       this.prisma.email.count({ where }),
     ]);
@@ -159,6 +162,10 @@ export class EmailsService {
         category: e.category,
         prefilterReason: e.prefilterReason,
         applicationId: e.applicationId,
+        applicationLabel: e.application
+          ? `${e.application.company.name} · ${e.application.roleTitle}`
+          : null,
+        confidence: e.confidence,
         gmailUrl: gmailWebUrl(e.rfc822MessageId, connection.googleEmail),
       })),
       total,

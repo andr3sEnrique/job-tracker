@@ -3,6 +3,7 @@ import {
   CalendarCheck,
   CheckCircle2,
   Code2,
+  ExternalLink,
   FileText,
   Mail,
   RefreshCw,
@@ -63,6 +64,17 @@ export function EventTimeline({ events }: { events: ApplicationEvent[] }) {
                 <SourceIcon className="size-3" aria-hidden />
                 {SOURCE_TEXT[event.source]}
               </span>
+              {event.emailUrl && (
+                <a
+                  href={event.emailUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                >
+                  Ver email
+                  <ExternalLink className="size-3" aria-hidden />
+                </a>
+              )}
               {event.fromStatus && event.toStatus && event.fromStatus !== event.toStatus && (
                 <span>
                   {STATUS_LABELS[event.fromStatus]} → {STATUS_LABELS[event.toStatus]}

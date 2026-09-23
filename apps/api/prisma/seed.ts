@@ -3,6 +3,8 @@
  * (SEED_USER_EMAIL, or the first ALLOWED_GOOGLE_EMAILS entry).
  *   pnpm db:seed          → only if the owner has no applications yet
  *   pnpm db:seed --force  → wipes the owner's data first
+ *   pnpm db:seed --clear  → removes the sample data only (for every user), keeping real
+ *                           applications (manual ones and those built from your Gmail)
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { generateSampleDataset } from '@jat/shared';
@@ -21,10 +23,24 @@ const ownerEmail = (
   .trim()
   .toLowerCase();
 const force = process.argv.includes('--force');
+const clear = process.argv.includes('--clear');
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
 
+/**
+ * Sample applications look like email-derived ones but no event points to a real email;
+ * real email-derived applications always have at least one.
+ */
+async function clearSampleData() {
+  const { count } = await prisma.application.deleteMany({
+    where: { origin: 'EMAIL', events: { none: { emailId: { not: null } } } },
+  });
+  const orphans = await prisma.company.deleteMany({ where: { applications: { none: {} } } });
+  console.warn(`Removed ${count} sample applications and ${orphans.count} unused companies.`);
+}
+
 async function main() {
+  if (clear) return clearSampleData();
   const owner = await prisma.user.upsert({
     where: { email: ownerEmail },
     update: {},

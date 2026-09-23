@@ -16,7 +16,7 @@ import { SessionsService } from './sessions.service.js';
     ThrottlerModule.forRootAsync({
       inject: [AppConfig],
       useFactory: (config: AppConfig) => [
-        { name: 'default', ttl: 60_000, limit: 300 },
+        { name: 'default', ttl: 60_000, limit: config.get('RATE_LIMIT_PER_MINUTE') },
         {
           // Much stricter, and only for the login/logout endpoints.
           name: 'auth',

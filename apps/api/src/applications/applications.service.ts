@@ -14,6 +14,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toApplication, toApplicationEvent } from './applications.mapper.js';
 import { buildApplicationsOrderBy, buildApplicationsWhere } from './applications.query.js';
+import { gmailWebUrl } from '../gmail/message-headers.js';
 import { normalizeCompanyName } from './company-name.js';
 
 type Tx = Prisma.TransactionClient;
@@ -40,10 +41,30 @@ export class ApplicationsService {
   async get(userId: string, id: string): Promise<ApplicationDetail> {
     const row = await this.prisma.application.findFirst({
       where: { id, userId },
-      include: { company: true, events: { orderBy: { occurredAt: 'desc' } } },
+      include: {
+        company: true,
+        events: {
+          orderBy: { occurredAt: 'desc' },
+          include: {
+            email: {
+              select: { rfc822MessageId: true, connection: { select: { googleEmail: true } } },
+            },
+          },
+        },
+      },
     });
     if (!row) throw new NotFoundException('Application not found');
-    return { ...toApplication(row), events: row.events.map(toApplicationEvent) };
+    return {
+      ...toApplication(row),
+      events: row.events.map((event) =>
+        toApplicationEvent(
+          event,
+          event.email
+            ? gmailWebUrl(event.email.rfc822MessageId, event.email.connection.googleEmail)
+            : null,
+        ),
+      ),
+    };
   }
 
   async create(userId: string, input: CreateApplicationInput): Promise<ApplicationDetail> {

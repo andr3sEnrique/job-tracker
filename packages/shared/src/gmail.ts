@@ -48,6 +48,7 @@ export const gmailStatusSchema = z.discriminatedUnion('connected', [
     counts: z.object({
       candidates: z.number().int(),
       pending: z.number().int(),
+      needsReview: z.number().int(),
       skipped: z.number().int(),
     }),
     lastRun: syncRunSchema.nullable(),
@@ -55,8 +56,18 @@ export const gmailStatusSchema = z.discriminatedUnion('connected', [
 ]);
 export type GmailStatus = z.infer<typeof gmailStatusSchema>;
 
+export const processingResultSchema = z.object({
+  processed: z.number().int(),
+  needsReview: z.number().int(),
+  failed: z.number().int(),
+  /** Candidates still waiting to be classified. */
+  remaining: z.number().int(),
+});
+
 export const syncResultSchema = z.object({
   run: syncRunSchema,
+  /** Classification progress; null while the mailbox is still being listed. */
+  processing: processingResultSchema.nullable(),
   /** The chunk ended before the mailbox was fully walked; call again to continue. */
   hasMore: z.boolean(),
 });
@@ -74,6 +85,9 @@ export const emailSummarySchema = z.object({
   /** Why the prefilter kept it, e.g. "ats-sender:greenhouse.io" or "subject:entrevista". */
   prefilterReason: z.string().nullable(),
   applicationId: z.string().nullable(),
+  /** "Company · Role" of the linked application, for display. */
+  applicationLabel: z.string().nullable(),
+  confidence: z.number().nullable(),
   /** Opens the original message in Gmail; the app itself never shows its content. */
   gmailUrl: z.string().nullable(),
 });
@@ -97,3 +111,30 @@ export const listEmailsParamsSchema = z.preprocess((raw) => {
     pageSize: num(r.pageSize),
   };
 }, listEmailsQuerySchema);
+
+/**
+ * Human decisions from the review inbox. "assign" and "create" also let the user fix the
+ * category the classifier chose.
+ */
+export const resolveEmailSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('confirm') }),
+  z.object({ action: z.literal('ignore') }),
+  z.object({
+    action: z.literal('assign'),
+    applicationId: z.string(),
+    category: emailCategorySchema,
+  }),
+  z.object({
+    action: z.literal('create'),
+    companyName: z.string().trim().min(1).max(200),
+    roleTitle: z.string().trim().min(1).max(200),
+    category: emailCategorySchema,
+  }),
+]);
+export type ResolveEmailInput = z.infer<typeof resolveEmailSchema>;
+
+export const reprocessResultSchema = z.object({
+  emailsReset: z.number().int(),
+  applicationsRemoved: z.number().int(),
+});
+export type ReprocessResult = z.infer<typeof reprocessResultSchema>;

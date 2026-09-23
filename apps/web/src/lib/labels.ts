@@ -1,4 +1,10 @@
-import type { ApplicationSource, ApplicationStatus, EventType, WorkMode } from '@jat/shared';
+import type {
+  ApplicationSource,
+  ApplicationStatus,
+  EmailCategory,
+  EventType,
+  WorkMode,
+} from '@jat/shared';
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   APPLIED: 'Aplicada',
@@ -52,3 +58,27 @@ export const EVENT_LABELS: Record<EventType, string> = {
   STATUS_CHANGED: 'Cambio de estado',
   NOTE: 'Nota',
 };
+
+export const CATEGORY_LABELS: Record<EmailCategory, string> = {
+  APPLICATION_SUBMITTED: 'Candidatura enviada',
+  APPLICATION_CONFIRMATION: 'Confirmación',
+  RECRUITER_REPLY: 'Recruiter',
+  INTERVIEW: 'Entrevista',
+  TECHNICAL_INTERVIEW: 'Entrevista técnica',
+  REJECTION: 'Rechazo',
+  OFFER: 'Oferta',
+  JOB_ALERT: 'Alerta de empleo',
+  IRRELEVANT: 'Irrelevante',
+  UNKNOWN: 'Sin clasificar',
+};
+
+/** Categories that belong to an application (the rest never create events). */
+export const APPLICATION_CATEGORIES: EmailCategory[] = [
+  'APPLICATION_SUBMITTED',
+  'APPLICATION_CONFIRMATION',
+  'RECRUITER_REPLY',
+  'INTERVIEW',
+  'TECHNICAL_INTERVIEW',
+  'REJECTION',
+  'OFFER',
+];

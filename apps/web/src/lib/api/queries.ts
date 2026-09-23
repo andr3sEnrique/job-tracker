@@ -6,6 +6,7 @@ import type {
   CreateApplicationInput,
   ListApplicationsQuery,
   ListEmailsQuery,
+  ResolveEmailInput,
   UpdateApplicationInput,
 } from '@jat/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -32,6 +33,31 @@ export function useEmails(query: ListEmailsQuery) {
     queryFn: () => api.listEmails(query),
     placeholderData: keepPreviousData,
   });
+}
+
+/** Review decisions and reprocessing change emails, applications and stats alike. */
+function useInvalidateMailData() {
+  const queryClient = useQueryClient();
+  return () =>
+    Promise.all(
+      ['emails', 'gmail', 'applications', 'stats'].map((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] }),
+      ),
+    );
+}
+
+export function useResolveEmail() {
+  const invalidate = useInvalidateMailData();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ResolveEmailInput }) =>
+      api.resolveEmail(id, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useReprocessEmails() {
+  const invalidate = useInvalidateMailData();
+  return useMutation({ mutationFn: () => api.reprocessEmails(), onSuccess: invalidate });
 }
 
 export function useDisconnectGmail() {

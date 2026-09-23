@@ -126,7 +126,12 @@ export class GmailConnectionsService {
       lastSyncedAt: connection.lastSyncedAt?.toISOString() ?? null,
       initialSyncCompleted: connection.initialSyncCompletedAt !== null,
       syncWindowDays: this.config.get('GMAIL_INITIAL_SYNC_DAYS'),
-      counts: { candidates: total - skipped, pending: count('PENDING'), skipped },
+      counts: {
+        candidates: total - skipped,
+        pending: count('PENDING') + count('FAILED'),
+        needsReview: count('NEEDS_REVIEW'),
+        skipped,
+      },
       lastRun: lastRun ? toSyncRun(lastRun) : null,
     };
   }

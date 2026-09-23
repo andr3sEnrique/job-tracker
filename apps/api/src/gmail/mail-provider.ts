@@ -12,6 +12,15 @@ export interface MessageMetadata extends MessageRef {
   labels: string[];
 }
 
+/**
+ * Message body, for classification only. Lives in memory while an email is processed and
+ * is never persisted or logged.
+ */
+export interface MessageContent {
+  text: string | null;
+  html: string | null;
+}
+
 export interface ConnectResult {
   refreshToken: string | null;
   scopes: string[];
@@ -52,4 +61,5 @@ export abstract class MailProvider {
     params: { query: string; pageToken?: string; pageSize: number },
   ): Promise<{ messages: MessageRef[]; nextPageToken?: string }>;
   abstract getMetadata(refreshToken: string, ids: readonly string[]): Promise<MessageMetadata[]>;
+  abstract getContent(refreshToken: string, id: string): Promise<MessageContent>;
 }

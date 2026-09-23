@@ -10,6 +10,7 @@ process.env.FRONTEND_URL = 'http://localhost:3000';
 process.env.ALLOWED_GOOGLE_EMAILS = 'owner@test.local,other@test.local';
 // Every test logs in through the rate-limited auth endpoints (10/min in real use).
 process.env.AUTH_RATE_LIMIT_PER_MINUTE = '1000';
+process.env.RATE_LIMIT_PER_MINUTE = '100000';
 process.env.MAIL_PROVIDER = 'fake';
 // One page per sync call, so the tests exercise chunking and resuming.
 process.env.SYNC_PAGE_SIZE = '100';

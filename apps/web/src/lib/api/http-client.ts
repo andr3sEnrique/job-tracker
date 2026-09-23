@@ -6,6 +6,7 @@ import {
   dashboardStatsSchema,
   emailSummarySchema,
   gmailStatusSchema,
+  reprocessResultSchema,
   syncResultSchema,
   paginatedSchema,
   toListApplicationsParams,
@@ -128,6 +129,15 @@ export const httpApiClient: ApiClient = {
     if (query.status?.length) params.set('status', query.status.join(','));
     return request(`/emails?${params}`, paginatedSchema(emailSummarySchema));
   },
+
+  async resolveEmail(id, input) {
+    await request(`/emails/${encodeURIComponent(id)}/resolve`, null, {
+      method: 'POST',
+      ...json(input),
+    });
+  },
+
+  reprocessEmails: () => request('/emails/reprocess', reprocessResultSchema, { method: 'POST' }),
 
   async deleteApplication(id) {
     await request(`/applications/${encodeURIComponent(id)}`, null, { method: 'DELETE' });

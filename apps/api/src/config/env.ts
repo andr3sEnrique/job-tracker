@@ -43,6 +43,8 @@ export const envSchema = z
     SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
     /** Per-IP limit for the login endpoints (brute-force and abuse protection). */
     AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
+    /** Per-IP limit for everything else. */
+    RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
 
     /** AES-256-GCM key for Gmail refresh tokens. Generate with `openssl rand -base64 32`. */
     TOKEN_ENCRYPTION_KEY: base64Key.optional(),

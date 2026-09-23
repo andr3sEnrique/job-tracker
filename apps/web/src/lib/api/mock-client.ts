@@ -39,8 +39,8 @@ function mustGet(id: string) {
   return found;
 }
 
-function pushEvent(event: Omit<ApplicationEvent, 'id'>): ApplicationEvent {
-  const created = { ...event, id: newId() };
+function pushEvent(event: Omit<ApplicationEvent, 'id' | 'emailUrl'>): ApplicationEvent {
+  const created = { ...event, id: newId(), emailUrl: null };
   db().events.push(created);
   return created;
 }
@@ -61,10 +61,12 @@ function mockEmails(): EmailSummary[] {
         fromEmail: `careers@${domain}`,
         subject: e.summary ?? 'Actualización de tu candidatura',
         receivedAt: e.occurredAt,
-        processingStatus: 'PENDING' as const,
-        category: null,
+        processingStatus: 'PROCESSED' as const,
+        category: 'APPLICATION_CONFIRMATION' as const,
         prefilterReason: 'subject:candidatura',
-        applicationId: null,
+        applicationId: e.applicationId,
+        applicationLabel: app ? `${app.company.name} · ${app.roleTitle}` : null,
+        confidence: 0.85,
         gmailUrl: null,
       };
     }));
@@ -181,13 +183,14 @@ export const mockApiClient: ApiClient = {
       lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
       initialSyncCompleted: true,
       syncWindowDays: 180,
-      counts: { candidates: mockEmails().length, pending: mockEmails().length, skipped: 312 },
+      counts: { candidates: mockEmails().length, pending: 0, needsReview: 3, skipped: 312 },
       lastRun: null,
     }),
 
   runSync: () =>
     delay({
       hasMore: false,
+      processing: { processed: 0, needsReview: 0, failed: 0, remaining: 0 },
       run: {
         id: 'mock-run',
         type: 'MANUAL' as const,
@@ -203,6 +206,10 @@ export const mockApiClient: ApiClient = {
     }),
 
   disconnectGmail: () => delay(undefined),
+
+  resolveEmail: () => delay(undefined),
+
+  reprocessEmails: () => delay({ emailsReset: mockEmails().length, applicationsRemoved: 0 }),
 
   listEmails: (query) => {
     const all = mockEmails();

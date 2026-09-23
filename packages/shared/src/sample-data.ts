@@ -235,6 +235,7 @@ export function generateSampleDataset({
         occurredAt: new Date(cursor).toISOString(),
         source: step.type === 'STATUS_CHANGED' && step.toStatus === 'GHOSTED' ? 'SYSTEM' : 'EMAIL',
         summary: step.summary,
+        emailUrl: null,
       });
     });
 

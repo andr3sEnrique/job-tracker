@@ -220,9 +220,13 @@ model ApplicationEvent {
   source        EventSource
   summary       String?
   metadata      Json?
+  /// The email that produced this event. Unique: one email yields at most one event,
+  /// so re-processing can never duplicate history.
+  emailId       String?            @unique @map("email_id") @db.Uuid
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  email       Email?      @relation(fields: [emailId], references: [id], onDelete: SetNull)
 
   @@index([applicationId, occurredAt(sort: Desc)])
   @@index([occurredAt(sort: Desc)])
@@ -332,8 +336,9 @@ model Email {
   updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   connection  GmailConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  thread      EmailThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  application Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  application Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  event       ApplicationEvent?
 
   @@unique([connectionId, gmailMessageId])
   @@index([connectionId, processingStatus, nextAttemptAt])

@@ -8,7 +8,7 @@
  * Bump whenever the rules below change: connected mailboxes are then re-scanned over the
  * whole sync window (and previously discarded mail re-evaluated) on their next sync.
  */
-export const PREFILTER_VERSION = 3;
+export const PREFILTER_VERSION = 4;
 
 /** Applicant tracking systems and job platforms: mail from them is job-related by default. */
 export const JOB_SENDER_DOMAINS = [
@@ -93,6 +93,7 @@ export const JOB_SUBJECT_KEYWORDS = [
   'vacante',
   'puesto de',
   'postulacion',
+  'prueba tecnica',
   // en
   'application',
   'applying',
@@ -108,6 +109,8 @@ export const JOB_SUBJECT_KEYWORDS = [
   'next steps',
   'assessment',
   'coding challenge',
+  'technical test',
+  'take-home',
   'your profile',
   'thank you for your interest',
   // Direct recruiter outreach ("Opportunity at Acme"). Noisier: Phase 5 classifies the rest out.
@@ -124,6 +127,7 @@ export const JOB_SUBJECT_KEYWORDS = [
   'merci pour votre interet',
   'suite a votre',
   'processus de recrutement',
+  'test technique',
 ] as const;
 
 /** Never job mail, whatever the headers say. */

@@ -34,7 +34,10 @@ export function toApplication(row: ApplicationWithCompany): Application {
   };
 }
 
-export function toApplicationEvent(row: ApplicationEventRow): ApplicationEvent {
+export function toApplicationEvent(
+  row: ApplicationEventRow,
+  emailUrl: string | null = null,
+): ApplicationEvent {
   return {
     id: row.id,
     applicationId: row.applicationId,
@@ -44,5 +47,6 @@ export function toApplicationEvent(row: ApplicationEventRow): ApplicationEvent {
     occurredAt: row.occurredAt.toISOString(),
     source: row.source,
     summary: row.summary,
+    emailUrl,
   };
 }

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { SyncResult } from '@jat/shared';
 import { AppConfig } from '../config/app-config.service.js';
 import { EmailsService } from '../emails/emails.service.js';
+import { EmailProcessorService } from '../emails/email-processor.service.js';
 import { buildGmailSearchQuery, PREFILTER_VERSION } from '../emails/prefilter.js';
 import type { SyncRun as SyncRunRow, SyncRunType } from '../generated/prisma/client.js';
 import { GmailConnectionsService, toSyncRun } from '../gmail/gmail-connections.service.js';
@@ -11,6 +12,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Extra lease time beyond the budget, in case a page takes long. */
 const LOCK_MARGIN_MS = 60_000;
+/** A sync that finished this recently is continued (classification) rather than repeated. */
+const CONTINUE_WINDOW_MS = 10 * 60_000;
 
 /**
  * Walks the mailbox in bounded chunks. Each call processes pages until the time budget runs
@@ -27,6 +30,7 @@ export class SyncService {
     private readonly emails: EmailsService,
     private readonly mail: MailProvider,
     private readonly config: AppConfig,
+    private readonly processor: EmailProcessorService,
   ) {}
 
   async run(userId: string): Promise<SyncResult> {
@@ -54,6 +58,13 @@ export class SyncService {
         ? 'RESCAN'
         : 'MANUAL';
     const fullWindow = type !== 'MANUAL';
+
+    // Still classifying the result of a sync that just finished? Continue with that instead
+    // of listing the mailbox again on every call.
+    if (type === 'MANUAL') {
+      const continued = await this.continueProcessing(connection, refreshToken, started + budget);
+      if (continued) return continued;
+    }
 
     let run = await this.startOrResumeRun(connection.id, type);
     try {
@@ -120,10 +131,56 @@ export class SyncService {
             ...(run.type === 'INITIAL' && { initialSyncCompletedAt: new Date() }),
           },
         });
+        // Listing finished: spend the rest of the budget classifying stored candidates.
+        const processing = await this.processor.processPending(
+          connection,
+          refreshToken,
+          started + budget,
+        );
+        return { run: toSyncRun(run), processing, hasMore: processing.remaining > 0 };
       }
-      return { run: toSyncRun(run), hasMore: !done };
+      return { run: toSyncRun(run), processing: null, hasMore: true };
     } catch (error) {
-      return { run: toSyncRun(await this.fail(run, connection.id, error)), hasMore: false };
+      return {
+        run: toSyncRun(await this.fail(run, connection.id, error)),
+        processing: null,
+        hasMore: false,
+      };
+    } finally {
+      await this.prisma.gmailConnection.update({
+        where: { id: connection.id },
+        data: { syncLockedUntil: null },
+      });
+    }
+  }
+
+  private async continueProcessing(
+    connection: { id: string; userId: string },
+    refreshToken: string,
+    deadline: number,
+  ): Promise<SyncResult | null> {
+    const lastRun = await this.prisma.syncRun.findFirst({
+      where: { connectionId: connection.id },
+      orderBy: { startedAt: 'desc' },
+    });
+    if (
+      !lastRun?.finishedAt ||
+      lastRun.status !== 'SUCCESS' ||
+      Date.now() - lastRun.finishedAt.getTime() > CONTINUE_WINDOW_MS ||
+      (await this.processor.countDue(connection.id)) === 0
+    ) {
+      return null;
+    }
+
+    try {
+      const processing = await this.processor.processPending(connection, refreshToken, deadline);
+      return { run: toSyncRun(lastRun), processing, hasMore: processing.remaining > 0 };
+    } catch (error) {
+      return {
+        run: toSyncRun(await this.fail(lastRun, connection.id, error)),
+        processing: null,
+        hasMore: false,
+      };
     } finally {
       await this.prisma.gmailConnection.update({
         where: { id: connection.id },

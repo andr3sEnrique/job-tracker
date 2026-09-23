@@ -1,6 +1,15 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Loader2, Mail, RefreshCw, Unplug } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Mail,
+  RefreshCw,
+  RotateCcw,
+  Unplug,
+} from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { QueryError } from '@/components/query-error';
 import {
@@ -19,7 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMailboxSync } from '@/hooks/use-mailbox-sync';
 import { ApiError } from '@/lib/api';
-import { useDisconnectGmail, useGmailStatus } from '@/lib/api/queries';
+import { useDisconnectGmail, useGmailStatus, useReprocessEmails } from '@/lib/api/queries';
 import { errorMessage } from '@/lib/errors';
 import { formatDateTime, formatRelative } from '@/lib/format';
 
@@ -29,12 +38,19 @@ const SYNC_ERRORS: Record<string, string> = {
   internal: 'La sincronización ha fallado. Inténtalo de nuevo.',
 };
 
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-lg border p-3">
+function Stat({ label, value, href }: { label: string; value: number | string; href?: string }) {
+  const content = (
+    <>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
-    </div>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="rounded-lg border p-3 hover:bg-muted">
+      {content}
+    </Link>
+  ) : (
+    <div className="rounded-lg border p-3">{content}</div>
   );
 }
 
@@ -42,6 +58,7 @@ export function GmailCard() {
   const { data: status, isPending, isError, refetch } = useGmailStatus();
   const sync = useMailboxSync();
   const disconnect = useDisconnectGmail();
+  const reprocess = useReprocessEmails();
 
   async function runSync() {
     try {
@@ -109,18 +126,25 @@ export function GmailCard() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat label="Relevantes" value={status.counts.candidates} />
-              <Stat label="Pendientes" value={status.counts.pending} />
+              <Stat
+                label="Por revisar"
+                value={status.counts.needsReview}
+                href={status.counts.needsReview ? '/emails?tab=review' : undefined}
+              />
+              <Stat label="Por clasificar" value={status.counts.pending} />
               <Stat label="Descartados" value={status.counts.skipped} />
             </div>
 
             {sync.running && (
               <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" aria-hidden />
-                {sync.progress
-                  ? `Revisados ${sync.progress.messagesListed} emails · ${sync.progress.candidates} relevantes`
-                  : 'Iniciando…'}
+                {!sync.progress
+                  ? 'Iniciando…'
+                  : sync.progress.processing
+                    ? `Clasificando… quedan ${sync.progress.processing.remaining}`
+                    : `Revisados ${sync.progress.run.messagesListed} emails · ${sync.progress.run.candidates} relevantes`}
               </div>
             )}
 
@@ -147,38 +171,79 @@ export function GmailCard() {
                   : 'Iniciar primera sincronización'}
               </Button>
 
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" size="sm" disabled={sync.running}>
-                    <Unplug />
-                    Desconectar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Desconectar Gmail?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se revocará el acceso en Google y se borrarán los metadatos de los{' '}
-                      {status.counts.candidates + status.counts.skipped} emails sincronizados. Tus
-                      candidaturas y su historial se conservan.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={() =>
-                        disconnect.mutate(undefined, {
-                          onSuccess: () => toast.success('Gmail desconectado y datos borrados'),
-                          onError: (error) => toast.error(errorMessage(error)),
-                        })
-                      }
+              <div className="flex flex-wrap items-center gap-1">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={sync.running || reprocess.isPending}
                     >
-                      Desconectar y borrar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      <RotateCcw />
+                      Reprocesar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Reprocesar todos los emails?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se borrarán las candidaturas y eventos creados automáticamente y los emails
+                        se volverán a clasificar con las reglas actuales. Lo que hayas creado o
+                        editado a mano se conserva.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() =>
+                          reprocess.mutate(undefined, {
+                            onSuccess: async (r) => {
+                              toast.success(`${r.emailsReset} emails en cola. Clasificando…`);
+                              await runSync();
+                            },
+                            onError: (error) => toast.error(errorMessage(error)),
+                          })
+                        }
+                      >
+                        Reprocesar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="sm" disabled={sync.running}>
+                      <Unplug />
+                      Desconectar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Desconectar Gmail?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se revocará el acceso en Google y se borrarán los metadatos de los{' '}
+                        {status.counts.candidates + status.counts.skipped} emails sincronizados. Tus
+                        candidaturas y su historial se conservan.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        onClick={() =>
+                          disconnect.mutate(undefined, {
+                            onSuccess: () => toast.success('Gmail desconectado y datos borrados'),
+                            onError: (error) => toast.error(errorMessage(error)),
+                          })
+                        }
+                      >
+                        Desconectar y borrar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
 
             <p className="text-xs text-muted-foreground">

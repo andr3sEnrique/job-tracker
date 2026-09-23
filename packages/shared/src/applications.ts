@@ -53,6 +53,8 @@ export const applicationEventSchema = z.object({
   occurredAt: z.iso.datetime(),
   source: eventSourceSchema,
   summary: z.string().nullable(),
+  /** Opens the email that produced this event in Gmail (EMAIL events only). */
+  emailUrl: z.string().nullable(),
 });
 export type ApplicationEvent = z.infer<typeof applicationEventSchema>;
 

@@ -12,9 +12,9 @@ import {
 } from './create-test-app.js';
 import type { FakeIdentityProvider } from './fake-identity-provider.js';
 
-// The fake mailbox cycles through 10 templates: 7 job-related, 3 irrelevant.
 const TOTAL = 240;
-const CANDIDATES = 168;
+// Every message built from a template passes the prefilter; the rest is personal/shop mail.
+const CANDIDATES = generateFakeMailbox(TOTAL).filter((m) => m.template !== null).length;
 
 describe('Gmail integration', () => {
   let app: INestApplication;
@@ -39,7 +39,7 @@ describe('Gmail integration', () => {
 
   async function syncUntilDone() {
     const results = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 200; i++) {
       const { body } = await client.post('/api/v1/sync/run').expect(200);
       results.push(body);
       if (!body.hasMore) break;
@@ -104,8 +104,9 @@ describe('Gmail integration', () => {
 
     it('walks the mailbox in resumable chunks and keeps only candidates with metadata', async () => {
       const results = await syncUntilDone();
-      expect(results[0].hasMore).toBe(true);
-      expect(results.length).toBe(3); // 240 messages, 100 per chunk
+      expect(results[0]).toMatchObject({ hasMore: true, processing: null });
+      // Listing takes 3 chunks (240 messages, 100 per chunk); classification follows.
+      expect(results.findIndex((r) => r.processing !== null)).toBe(2);
       expect(results.at(-1)).toMatchObject({
         hasMore: false,
         run: {
@@ -132,7 +133,9 @@ describe('Gmail integration', () => {
         skipped.every((e) => e.subject === null && e.fromEmail === null && e.fromName === null),
       ).toBe(true);
 
-      const kept = await prisma.email.findFirstOrThrow({ where: { processingStatus: 'PENDING' } });
+      const kept = await prisma.email.findFirstOrThrow({
+        where: { processingStatus: { not: 'SKIPPED' } },
+      });
       expect(kept).toMatchObject({ fromDomain: expect.any(String), subject: expect.any(String) });
       expect(kept.prefilterReason).toMatch(/^(ats-sender|job-sender|subject):/);
     });
@@ -142,27 +145,47 @@ describe('Gmail integration', () => {
       const { body } = await client.get('/api/v1/emails').query({ pageSize: '10' }).expect(200);
       expect(body.total).toBe(CANDIDATES);
       expect(body.items).toHaveLength(10);
-      expect(body.items[0]).toMatchObject({ processingStatus: 'PENDING', category: null });
+      expect(['PROCESSED', 'NEEDS_REVIEW']).toContain(body.items[0].processingStatus);
+      expect(body.items[0].category).not.toBeNull();
       expect(body.items[0].gmailUrl).toContain('rfc822msgid%3A');
 
+      // Stories reply in the same thread (e.g. confirmation then rejection).
+      const byThread = Map.groupBy(mail.mailbox, (m) => m.threadId);
+      const [sharedThreadId, messages] = [...byThread].find(([, ms]) => ms.length > 1)!;
       const thread = await prisma.emailThread.findFirstOrThrow({
-        where: { gmailThreadId: 'fake-thread-0000' },
+        where: { gmailThreadId: sharedThreadId },
       });
-      expect(thread.messageCount).toBe(2);
+      expect(thread.messageCount).toBe(messages.length);
     });
 
     it('is idempotent: re-syncing stores nothing twice', async () => {
       await syncUntilDone();
       const again = await syncUntilDone();
-      expect(again.length).toBe(3); // a multi-page manual sync resumes too, instead of restarting
+      expect(again).toHaveLength(1);
+      expect(again[0].run).toMatchObject({
+        type: 'MANUAL',
+        status: 'SUCCESS',
+        candidates: 0,
+        skipped: 0,
+      });
+      expect(await prisma.email.count()).toBe(TOTAL);
+    });
+
+    it('resumes a multi-page catch-up sync instead of restarting it', async () => {
+      await syncUntilDone();
+      // Last sync long ago: the catch-up window covers the whole mailbox again.
+      await prisma.gmailConnection.updateMany({
+        data: { lastSyncedAt: new Date(Date.now() - 400 * 86_400_000) },
+      });
+      const again = await syncUntilDone();
+      expect(again).toHaveLength(3);
+      expect(new Set(again.map((r) => r.run.id)).size).toBe(1);
       expect(again.at(-1).run).toMatchObject({
         type: 'MANUAL',
         status: 'SUCCESS',
         messagesListed: TOTAL,
         candidates: 0,
-        skipped: 0,
       });
-      expect(await prisma.email.count()).toBe(TOTAL);
     });
 
     it('picks up new messages on the next sync', async () => {
@@ -175,6 +198,10 @@ describe('Gmail integration', () => {
         rfc822MessageId: '<fresh@mail.fake>',
         receivedAt: new Date(),
         labels: ['INBOX'],
+        body: 'We would like to invite you to an interview.',
+        template: null,
+        company: null,
+        role: null,
       });
       await syncUntilDone();
       expect(await prisma.email.count()).toBe(TOTAL + 1);
@@ -185,10 +212,12 @@ describe('Gmail integration', () => {
     it('re-scans the whole window when the prefilter rules change, re-evaluating discarded mail', async () => {
       await syncUntilDone();
       // Simulate mail evaluated by older rules: some candidates had been discarded.
+      // (Mail that never produced an application, like job alerts.)
       const victims = await prisma.email.findMany({
-        where: { processingStatus: 'PENDING' },
+        where: { processingStatus: { not: 'SKIPPED' }, applicationId: null, category: 'JOB_ALERT' },
         take: 5,
       });
+      expect(victims).toHaveLength(5);
       await prisma.email.updateMany({
         where: { id: { in: victims.map((v) => v.id) } },
         data: {
@@ -210,7 +239,9 @@ describe('Gmail integration', () => {
       });
 
       expect(await prisma.email.count()).toBe(TOTAL);
-      expect(await prisma.email.count({ where: { processingStatus: 'PENDING' } })).toBe(CANDIDATES);
+      expect(await prisma.email.count({ where: { processingStatus: { not: 'SKIPPED' } } })).toBe(
+        CANDIDATES,
+      );
       const restored = await prisma.email.findFirstOrThrow({
         where: { gmailMessageId: victims[0]!.gmailMessageId },
       });
@@ -280,7 +311,7 @@ describe('Gmail integration', () => {
       expect(await prisma.email.count()).toBe(0);
       expect(await prisma.emailThread.count()).toBe(0);
       expect(await prisma.syncRun.count()).toBe(0);
-      expect(await prisma.application.count()).toBe(1);
+      expect(await prisma.application.count({ where: { company: { name: 'Acme' } } })).toBe(1);
     });
   });
 

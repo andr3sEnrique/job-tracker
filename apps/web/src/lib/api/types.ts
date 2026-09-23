@@ -9,6 +9,8 @@ import type {
   EmailSummary,
   GmailStatus,
   ListEmailsQuery,
+  ReprocessResult,
+  ResolveEmailInput,
   SyncResult,
   DashboardStats,
   ListApplicationsQuery,
@@ -37,4 +39,6 @@ export interface ApiClient {
   runSync(): Promise<SyncResult>;
   disconnectGmail(): Promise<void>;
   listEmails(query: ListEmailsQuery): Promise<Paginated<EmailSummary>>;
+  resolveEmail(id: string, input: ResolveEmailInput): Promise<void>;
+  reprocessEmails(): Promise<ReprocessResult>;
 }

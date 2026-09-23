@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { EmailsView } from '@/components/emails/emails-view';
 import { PageHeader } from '@/components/layout/page-header';
 
@@ -9,9 +10,12 @@ export default function EmailsPage() {
     <>
       <PageHeader
         title="Emails"
-        description="Emails de tu búsqueda de empleo detectados en Gmail. La clasificación automática llega en la fase 5."
+        description="Emails de tu búsqueda de empleo detectados en Gmail y cómo se han clasificado."
       />
-      <EmailsView />
+      {/* useSearchParams() needs a Suspense boundary. */}
+      <Suspense>
+        <EmailsView />
+      </Suspense>
     </>
   );
 }

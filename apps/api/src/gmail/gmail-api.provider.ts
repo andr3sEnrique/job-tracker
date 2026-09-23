@@ -7,6 +7,7 @@ import {
   MailAuthError,
   MailProvider,
   MailTransientError,
+  type MessageContent,
   type MessageMetadata,
 } from './mail-provider.js';
 
@@ -14,12 +15,37 @@ const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const METADATA_HEADERS = ['From', 'Subject', 'Message-ID'];
 const MAX_RETRIES = 3;
 
+interface GmailPart {
+  mimeType?: string;
+  headers?: { name: string; value: string }[];
+  body?: { data?: string; size?: number };
+  parts?: GmailPart[];
+}
+
 interface GmailMessage {
   id: string;
   threadId: string;
   internalDate?: string;
   labelIds?: string[];
-  payload?: { headers?: { name: string; value: string }[] };
+  payload?: GmailPart;
+}
+
+/** Depth-first search of the MIME tree for the first part of a given type (attachments skipped). */
+export function findBodyPart(part: GmailPart | undefined, mimeType: string): string | null {
+  if (!part) return null;
+  const isAttachment = part.headers?.some(
+    (h) =>
+      h.name.toLowerCase() === 'content-disposition' &&
+      h.value.toLowerCase().startsWith('attachment'),
+  );
+  if (!isAttachment && part.mimeType === mimeType && part.body?.data) {
+    return Buffer.from(part.body.data, 'base64url').toString('utf8');
+  }
+  for (const child of part.parts ?? []) {
+    const found = findBodyPart(child, mimeType);
+    if (found !== null) return found;
+  }
+  return null;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -130,6 +156,17 @@ export class GmailApiProvider extends MailProvider {
         labels: msg.labelIds ?? [],
       };
     });
+  }
+
+  async getContent(refreshToken: string, id: string): Promise<MessageContent> {
+    const msg = await this.call<GmailMessage>(
+      this.client(refreshToken),
+      `${API}/messages/${id}?format=full`,
+    );
+    return {
+      text: findBodyPart(msg.payload, 'text/plain'),
+      html: findBodyPart(msg.payload, 'text/html'),
+    };
   }
 
   /** GET with typed errors and exponential backoff (with jitter) on 429/5xx. */

@@ -4,9 +4,10 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 4 (integración con Gmail).** Conexión de solo lectura con Gmail, sincronización
-> inicial por tramos y almacenamiento de metadatos (nunca el contenido de los emails). La
-> clasificación automática llega en la fase 5. Ver el [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 5 (clasificación).** Los emails de Gmail se clasifican con reglas (EN/FR/ES) y
+> crean o actualizan candidaturas y su historial automáticamente; los casos dudosos van a una
+> bandeja de revisión. El contenido de los emails nunca se guarda. Ver el
+> [plan técnico](docs/PLAN_TECNICO.md).
 
 ## Stack
 
@@ -57,45 +58,69 @@ Para trabajar solo en la UI, sin API ni login: `pnpm dev:mock`.
 
 ## Scripts
 
-| Script                  | Qué hace                                                             |
-| ----------------------- | -------------------------------------------------------------------- |
-| `pnpm dev`              | PostgreSQL + migraciones + api y web en modo watch                   |
-| `pnpm dev:mock`         | Solo la web, con datos en memoria                                    |
-| `pnpm build`            | Build de producción de todo el workspace                             |
-| `pnpm lint`             | ESLint en todos los paquetes                                         |
-| `pnpm typecheck`        | `tsc --noEmit` (genera antes el cliente Prisma y los tipos de rutas) |
-| `pnpm test`             | Tests unitarios y de componentes (Vitest)                            |
-| `pnpm test:integration` | Tests de la API contra PostgreSQL real (Testcontainers)              |
-| `pnpm db:seed`          | Datos de ejemplo (`-- --force` para reemplazarlos)                   |
-| `pnpm db:studio`        | Prisma Studio                                                        |
-| `pnpm format`           | Prettier                                                             |
+| Script                  | Qué hace                                                              |
+| ----------------------- | --------------------------------------------------------------------- |
+| `pnpm dev`              | PostgreSQL + migraciones + api y web en modo watch                    |
+| `pnpm dev:mock`         | Solo la web, con datos en memoria                                     |
+| `pnpm build`            | Build de producción de todo el workspace                              |
+| `pnpm lint`             | ESLint en todos los paquetes                                          |
+| `pnpm typecheck`        | `tsc --noEmit` (genera antes el cliente Prisma y los tipos de rutas)  |
+| `pnpm test`             | Tests unitarios y de componentes (Vitest)                             |
+| `pnpm test:integration` | Tests de la API contra PostgreSQL real (Testcontainers)               |
+| `pnpm db:seed`          | Datos de ejemplo (`-- --force` los reemplaza, `-- --clear` los borra) |
+| `pnpm db:studio`        | Prisma Studio                                                         |
+| `pnpm format`           | Prettier                                                              |
 
 ## API
 
 Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de `@jat/shared`.
 
-| Método | Ruta                            | Descripción                                       |
-| ------ | ------------------------------- | ------------------------------------------------- |
-| GET    | `/applications`                 | Listado con búsqueda, filtros, orden y paginación |
-| POST   | `/applications`                 | Alta manual (crea el evento inicial)              |
-| GET    | `/applications/:id`             | Detalle con historial de eventos                  |
-| PATCH  | `/applications/:id`             | Edición parcial (bloquea los campos editados)     |
-| POST   | `/applications/:id/status`      | Cambio de estado (registra un evento)             |
-| POST   | `/applications/:id/notes`       | Añade una nota al historial                       |
-| DELETE | `/applications/:id`             | Borra la candidatura y su historial               |
-| GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                 |
-| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)    |
-| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                   |
-| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync    |
-| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados     |
-| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`) |
-| GET    | `/emails`                       | Metadatos de los emails relevantes                |
-| GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                   |
+| Método | Ruta                            | Descripción                                            |
+| ------ | ------------------------------- | ------------------------------------------------------ |
+| GET    | `/applications`                 | Listado con búsqueda, filtros, orden y paginación      |
+| POST   | `/applications`                 | Alta manual (crea el evento inicial)                   |
+| GET    | `/applications/:id`             | Detalle con historial de eventos                       |
+| PATCH  | `/applications/:id`             | Edición parcial (bloquea los campos editados)          |
+| POST   | `/applications/:id/status`      | Cambio de estado (registra un evento)                  |
+| POST   | `/applications/:id/notes`       | Añade una nota al historial                            |
+| DELETE | `/applications/:id`             | Borra la candidatura y su historial                    |
+| GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                      |
+| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)         |
+| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                        |
+| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync         |
+| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados          |
+| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)      |
+| GET    | `/emails`                       | Emails relevantes, su clasificación y candidatura      |
+| POST   | `/emails/:id/resolve`           | Revisión: confirmar, ignorar, asignar o crear          |
+| POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual) |
+| GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                        |
 
 **Seguridad:** todas las rutas exigen sesión salvo `health` y el login (guard global que deniega
 por defecto). Las peticiones que modifican datos requieren además la cabecera
 `X-Requested-With` y un `Origin` válido (CSRF), y el login tiene rate limiting. Detalles en
 [docs/setup-google-cloud.md](docs/setup-google-cloud.md#cómo-se-protege-el-acceso).
+
+## Cómo se procesa un email
+
+```
+Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
+                                    │  al sincronizar, de más antiguo a más reciente:
+                                    ▼
+      cuerpo (solo en memoria) ─► clasificador ─► extractor ─► asociación ─► evento
+                                   (reglas)       empresa,      hilo → URL →    + estado
+                                                  puesto, URL   empresa+puesto  recalculado
+```
+
+- **Clasificador** (`apps/api/src/classification`): reglas por prioridad (rechazo > oferta >
+  técnica > entrevista > envío > confirmación > alerta > recruiter). Detrás de la interfaz
+  `EmailClassifier`, para añadir IA en la fase 7 sin tocar el resto.
+- **Estado derivado del historial**: el estado de una candidatura se recalcula reproduciendo
+  sus eventos con una máquina de estados que solo avanza, así que el orden de llegada de los
+  emails no importa y deshacer (ignorar un email) es consistente.
+- **Lo manual gana**: los campos editados a mano nunca se sobrescriben con datos de emails.
+- **Evaluación**: `fake-mailbox.data.ts` contiene emails sintéticos EN/FR/ES con la categoría,
+  empresa y puesto esperados; `dataset.spec.ts` exige acertarlos todos. Cuando un email real se
+  clasifique mal, se añade aquí una versión anonimizada.
 
 ## Cómo está organizada la web
 
@@ -116,8 +141,8 @@ por defecto). Las peticiones que modifican datos requieren además la cabecera
 1. ~~Foundation + frontend~~
 2. ~~Backend (NestJS) + base de datos~~
 3. ~~Autenticación (Google OAuth, allowlist en backend)~~
-4. **Integración con Gmail** ← _actual_
-5. Clasificación de emails (reglas)
+4. ~~Integración con Gmail~~
+5. **Clasificación de emails (reglas)** ← _actual_
 6. Sincronización automática
 7. Extracción con IA
 8. Endurecimiento para producción
