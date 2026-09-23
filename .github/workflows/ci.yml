@@ -58,7 +58,7 @@ jobs:
       - run: pnpm --filter @jat/shared build
       - run: pnpm --filter @jat/web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
