@@ -1,5 +1,6 @@
 import type {
   AddNoteInput,
+  AiStatus,
   Application,
   ApplicationDetail,
   ApplicationEvent,
@@ -36,6 +37,7 @@ export interface ApiClient {
   getCurrentUser(): Promise<CurrentUser>;
   logout(): Promise<void>;
   getGmailStatus(): Promise<GmailStatus>;
+  getAiStatus(): Promise<AiStatus>;
   runSync(): Promise<SyncResult>;
   disconnectGmail(): Promise<void>;
   listEmails(query: ListEmailsQuery): Promise<Paginated<EmailSummary>>;

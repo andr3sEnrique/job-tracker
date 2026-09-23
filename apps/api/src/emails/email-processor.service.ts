@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailEventsService } from '../applications/email-events.service.js';
-import { extractJobData } from '../classification/extractor.js';
+import { EmailAnalyzer } from '../classification/analyzer.js';
 import { prepareEmail } from '../classification/prepare-email.js';
-import { EmailClassifier } from '../classification/types.js';
 import { MailAuthError, MailProvider } from '../gmail/mail-provider.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -29,7 +28,7 @@ export class EmailProcessorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailProvider,
-    private readonly classifier: EmailClassifier,
+    private readonly analyzer: EmailAnalyzer,
     private readonly events: EmailEventsService,
   ) {}
 
@@ -100,14 +99,15 @@ export class EmailProcessorService {
         html: content.html,
       });
 
-      const classification = this.classifier.classify(prepared);
-      const extracted = extractJobData(prepared);
+      const { classification, extracted, classifierId } = await this.analyzer.analyze(prepared, {
+        emailId: email.id,
+      });
       const outcome = await this.events.apply(
         userId,
         email,
         classification,
         extracted,
-        this.classifier.id,
+        classifierId,
       );
       return outcome === 'needs_review' ? 'needsReview' : 'processed';
     } catch (error) {

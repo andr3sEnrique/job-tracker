@@ -65,6 +65,25 @@ export const envSchema = z
     SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
     /** APPLIED/SCREENING applications without activity for this long become GHOSTED. */
     GHOSTED_AFTER_DAYS: z.coerce.number().int().min(7).max(365).default(30),
+
+    /**
+     * AI second opinion for the emails the rules are unsure about. `none` (default) keeps
+     * everything local; `anthropic` sends a redacted, truncated body to the API; `ollama`
+     * runs a local model; `fake` is for tests.
+     */
+    AI_PROVIDER: z.enum(['none', 'anthropic', 'ollama', 'fake']).default('none'),
+    /** Defaults per provider: claude-haiku-4-5 / llama3.1:8b. */
+    AI_MODEL: z.string().min(1).optional(),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    OLLAMA_URL: z.url().default('http://localhost:11434'),
+    /** Rules below this confidence (or missing the company) ask the AI. */
+    AI_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.8),
+    /** Circuit breaker: once this month's spend reaches it, only rules are used. */
+    AI_MONTHLY_BUDGET_USD: z.coerce.number().min(0).default(1),
+    /** Price per million tokens, for the budget (defaults: Claude Haiku 4.5). */
+    AI_INPUT_USD_PER_MTOK: z.coerce.number().min(0).default(1),
+    AI_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).default(5),
+    AI_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30_000),
   })
   .transform((env, ctx) => {
     const isProd = env.NODE_ENV === 'production';
@@ -87,6 +106,20 @@ export const envSchema = z
     for (const [key, value] of required) {
       if (!value) ctx.addIssue({ code: 'custom', path: [key], message: 'Required in production' });
     }
+    if (env.AI_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ANTHROPIC_API_KEY'],
+        message: 'Required when AI_PROVIDER=anthropic',
+      });
+    }
+    if (isProd && env.AI_PROVIDER === 'fake') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AI_PROVIDER'],
+        message: 'fake is not allowed in production',
+      });
+    }
     if (isProd && env.MAIL_PROVIDER === 'fake') {
       ctx.addIssue({
         code: 'custom',
@@ -108,6 +141,11 @@ export const envSchema = z
       DATABASE_URL: databaseUrl as string,
       COOKIE_SECRET: cookieSecret as string,
       TOKEN_ENCRYPTION_KEY: tokenKey as string,
+      AI_MODEL:
+        env.AI_MODEL ??
+        { none: 'none', anthropic: 'claude-haiku-4-5', ollama: 'llama3.1:8b', fake: 'fake' }[
+          env.AI_PROVIDER
+        ],
       /** Cookies need the Secure flag whenever the site is served over HTTPS. */
       SECURE_COOKIES: env.FRONTEND_URL.startsWith('https://'),
     };

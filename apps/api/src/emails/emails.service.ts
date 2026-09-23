@@ -166,6 +166,7 @@ export class EmailsService {
           ? `${e.application.company.name} · ${e.application.roleTitle}`
           : null,
         confidence: e.confidence,
+        classifier: e.classifier,
         gmailUrl: gmailWebUrl(e.rfc822MessageId, connection.googleEmail),
       })),
       total,

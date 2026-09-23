@@ -347,6 +347,7 @@ model Email {
   thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
   application Application?      @relation(fields: [applicationId], references: [id], onDelete: SetNull)
   event       ApplicationEvent?
+  aiRuns      AiRun[]
 
   @@unique([connectionId, gmailMessageId])
   @@index([connectionId, processingStatus, nextAttemptAt])
@@ -354,4 +355,39 @@ model Email {
   @@index([fromDomain])
   @@index([applicationId])
   @@map("emails")
+}
+
+enum AiRunStatus {
+  OK
+  /// The model answered something that failed validation: rules were used instead.
+  INVALID_OUTPUT
+  ERROR
+  /// Monthly budget reached: not called, rules were used.
+  SKIPPED_BUDGET
+}
+
+/// One AI call (or skipped call). Audit, cost control and cache: a reprocessed email reuses
+/// the stored output of the same model and prompt version instead of paying again.
+/// Holds structured output only, never email text.
+model AiRun {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  /// Kept (null) when the email is deleted, so past spending still counts for the budget.
+  emailId       String?     @map("email_id") @db.Uuid
+  provider      String
+  model         String
+  promptVersion String      @map("prompt_version")
+  status        AiRunStatus
+  inputTokens   Int         @default(0) @map("input_tokens")
+  outputTokens  Int         @default(0) @map("output_tokens")
+  latencyMs     Int         @default(0) @map("latency_ms")
+  costUsd       Decimal     @default(0) @map("cost_usd") @db.Decimal(10, 6)
+  output        Json?
+  errorCode     String?     @map("error_code")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  email Email? @relation(fields: [emailId], references: [id], onDelete: SetNull)
+
+  @@index([emailId])
+  @@index([createdAt])
+  @@map("ai_runs")
 }

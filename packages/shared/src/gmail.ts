@@ -94,6 +94,8 @@ export const emailSummarySchema = z.object({
   /** "Company · Role" of the linked application, for display. */
   applicationLabel: z.string().nullable(),
   confidence: z.number().nullable(),
+  /** Who decided: `rules@2`, `ai:claude-haiku-4-5@prompt-v1`… */
+  classifier: z.string().nullable(),
   /** Opens the original message in Gmail; the app itself never shows its content. */
   gmailUrl: z.string().nullable(),
 });

@@ -4,11 +4,11 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 6 (sincronización automática).** Los emails de Gmail se clasifican con reglas
-> (EN/FR/ES) y crean o actualizan candidaturas y su historial; los casos dudosos van a una bandeja
-> de revisión. Tras la carga inicial, la sincronización es incremental (Gmail History API) y se
-> lanza sola desde un cron externo o un temporizador interno. El contenido de los emails nunca se
-> guarda. Ver el [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 7 (IA).** Los emails de Gmail se clasifican con reglas (EN/FR/ES) y, solo cuando
+> las reglas dudan, con un modelo de IA opcional (Claude Haiku 4.5 por defecto, u Ollama en local)
+> con presupuesto mensual. Crean o actualizan candidaturas y su historial; los casos dudosos van a
+> una bandeja de revisión. La sincronización es incremental (Gmail History API) y automática. El
+> contenido de los emails nunca se guarda. Ver el [plan técnico](docs/PLAN_TECNICO.md).
 
 ## Stack
 
@@ -76,26 +76,27 @@ Para trabajar solo en la UI, sin API ni login: `pnpm dev:mock`.
 
 Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de `@jat/shared`.
 
-| Método | Ruta                            | Descripción                                            |
-| ------ | ------------------------------- | ------------------------------------------------------ |
-| GET    | `/applications`                 | Listado con búsqueda, filtros, orden y paginación      |
-| POST   | `/applications`                 | Alta manual (crea el evento inicial)                   |
-| GET    | `/applications/:id`             | Detalle con historial de eventos                       |
-| PATCH  | `/applications/:id`             | Edición parcial (bloquea los campos editados)          |
-| POST   | `/applications/:id/status`      | Cambio de estado (registra un evento)                  |
-| POST   | `/applications/:id/notes`       | Añade una nota al historial                            |
-| DELETE | `/applications/:id`             | Borra la candidatura y su historial                    |
-| GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                      |
-| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)         |
-| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                        |
-| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync         |
-| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados          |
-| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)      |
-| POST   | `/internal/sync`                | Sync de todos los buzones + mantenimiento (cron)       |
-| GET    | `/emails`                       | Emails relevantes, su clasificación y candidatura      |
-| POST   | `/emails/:id/resolve`           | Revisión: confirmar, ignorar, asignar o crear          |
-| POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual) |
-| GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                        |
+| Método | Ruta                            | Descripción                                             |
+| ------ | ------------------------------- | ------------------------------------------------------- |
+| GET    | `/applications`                 | Listado con búsqueda, filtros, orden y paginación       |
+| POST   | `/applications`                 | Alta manual (crea el evento inicial)                    |
+| GET    | `/applications/:id`             | Detalle con historial de eventos                        |
+| PATCH  | `/applications/:id`             | Edición parcial (bloquea los campos editados)           |
+| POST   | `/applications/:id/status`      | Cambio de estado (registra un evento)                   |
+| POST   | `/applications/:id/notes`       | Añade una nota al historial                             |
+| DELETE | `/applications/:id`             | Borra la candidatura y su historial                     |
+| GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                       |
+| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)          |
+| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                         |
+| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync          |
+| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados           |
+| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)       |
+| POST   | `/internal/sync`                | Sync de todos los buzones + mantenimiento (cron)        |
+| GET    | `/ai/status`                    | Proveedor, modelo y gasto del mes frente al presupuesto |
+| GET    | `/emails`                       | Emails relevantes, su clasificación y candidatura       |
+| POST   | `/emails/:id/resolve`           | Revisión: confirmar, ignorar, asignar o crear           |
+| POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual)  |
+| GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                         |
 
 **Seguridad:** todas las rutas exigen sesión salvo `health`, el login y `/internal/sync` (guard
 global que deniega por defecto). `/internal/sync` no usa cookies: exige la cabecera
@@ -115,8 +116,10 @@ Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
 ```
 
 - **Clasificador** (`apps/api/src/classification`): reglas por prioridad (rechazo > oferta >
-  técnica > entrevista > envío > confirmación > alerta > recruiter). Detrás de la interfaz
-  `EmailClassifier`, para añadir IA en la fase 7 sin tocar el resto.
+  técnica > entrevista > envío > confirmación > alerta > recruiter).
+- **IA como segunda opinión** (`apps/api/src/ai`, opcional): solo si las reglas dan `UNKNOWN`,
+  una confianza baja o un email de candidatura sin empresa o puesto. Ver
+  [IA](#ia-opcional).
 - **Estado derivado del historial**: el estado de una candidatura se recalcula reproduciendo
   sus eventos con una máquina de estados que solo avanza, así que el orden de llegada de los
   emails no importa y deshacer (ignorar un email) es consistente.
@@ -124,6 +127,34 @@ Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
 - **Evaluación**: `fake-mailbox.data.ts` contiene emails sintéticos EN/FR/ES con la categoría,
   empresa y puesto esperados; `dataset.spec.ts` exige acertarlos todos. Cuando un email real se
   clasifique mal, se añade aquí una versión anonimizada.
+
+## IA (opcional)
+
+```
+EmailAnalyzer (híbrido) ─► reglas ─► ¿seguras? ── sí ──► resultado
+                                         │ no
+                                         ▼
+                           AiEmailAnalyzer (dominio: prompt versionado, presupuesto, ai_runs)
+                                         │
+                           LlmProvider (puerto genérico: texto + schema Zod → objeto validado)
+                               ├─ AnthropicProvider (tool use forzado)
+                               ├─ OllamaProvider (local, gratis)
+                               └─ FakeLlmProvider (tests)
+```
+
+- **Desactivada por defecto** (`AI_PROVIDER=none`): nada sale del servidor.
+- **Qué se envía**: asunto, dominio del remitente y el cuerpo limpio, recortado a 4.000
+  caracteres y **anonimizado**: sin direcciones de email, teléfonos ni query strings de los
+  enlaces. El email se trata como dato no fiable (el prompt ignora instrucciones que contenga).
+- **Nunca se inventa**: la salida se valida siempre con Zod; si no cuadra se registra
+  `INVALID_OUTPUT` y se usan las reglas. Una URL que no aparece en el email se descarta.
+- **Coste**: `ai_runs` registra tokens, latencia y coste de cada llamada. Hace de caché
+  (reprocesar no vuelve a pagar) y de circuit breaker: al llegar a `AI_MONTHLY_BUDGET_USD` se
+  vuelve a solo reglas hasta el mes siguiente. Con Haiku 4.5 cuesta unos 0,2 céntimos de dólar por
+  email, y solo llegan los dudosos.
+- **Evaluación**: `pnpm --filter @jat/api eval:ai` mide la IA frente a las reglas sobre el
+  dataset sintético y los casos anonimizados (categoría, empresa y puesto) y estima el coste. Se
+  lanza a mano: gasta tokens reales.
 
 ## Sincronización automática
 
@@ -167,6 +198,6 @@ Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
 3. ~~Autenticación (Google OAuth, allowlist en backend)~~
 4. ~~Integración con Gmail~~
 5. ~~Clasificación de emails (reglas)~~
-6. **Sincronización automática** ← _actual_
-7. Extracción con IA
+6. ~~Sincronización automática~~
+7. **Clasificación y extracción con IA** ← _actual_
 8. Endurecimiento para producción

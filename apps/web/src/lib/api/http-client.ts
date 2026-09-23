@@ -1,4 +1,5 @@
 import {
+  aiStatusSchema,
   applicationDetailSchema,
   applicationEventSchema,
   applicationSchema,
@@ -114,6 +115,7 @@ export const httpApiClient: ApiClient = {
   },
 
   getGmailStatus: () => request('/gmail/status', gmailStatusSchema),
+  getAiStatus: () => request('/ai/status', aiStatusSchema),
 
   runSync: () => request('/sync/run', syncResultSchema, { method: 'POST' }),
 

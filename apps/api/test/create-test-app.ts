@@ -1,6 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { FakeLlmProvider } from '../src/ai/fake-llm.provider.js';
+import { LlmProvider } from '../src/ai/llm-provider.js';
 import { AppModule } from '../src/app.module.js';
 import { IdentityProvider } from '../src/auth/identity-provider.js';
 import { configureApp } from '../src/configure-app.js';
@@ -14,7 +16,11 @@ export const OWNER_EMAIL = 'owner@test.local';
 export async function createTestApp() {
   const identity = new FakeIdentityProvider();
   const mail = new FakeMailProvider();
+  // Disabled by default: only the AI tests turn it on.
+  const llm = new FakeLlmProvider();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(LlmProvider)
+    .useValue(llm)
     .overrideProvider(IdentityProvider)
     .useValue(identity)
     .overrideProvider(MailProvider)
@@ -30,7 +36,7 @@ export async function createTestApp() {
     throw new Error('Integration tests must not run against the dev database');
   }
 
-  return { app, prisma, identity, mail };
+  return { app, prisma, identity, mail, llm };
 }
 
 export async function resetDatabase(prisma: PrismaService) {

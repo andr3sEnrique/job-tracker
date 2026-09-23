@@ -20,11 +20,16 @@ export const queryKeys = {
   dashboard: ['stats', 'dashboard'] as const,
   me: ['auth', 'me'] as const,
   gmailStatus: ['gmail', 'status'] as const,
+  aiStatus: ['ai', 'status'] as const,
   emails: (query: ListEmailsQuery) => ['emails', query] as const,
 };
 
 export function useGmailStatus() {
   return useQuery({ queryKey: queryKeys.gmailStatus, queryFn: () => api.getGmailStatus() });
+}
+
+export function useAiStatus() {
+  return useQuery({ queryKey: queryKeys.aiStatus, queryFn: () => api.getAiStatus() });
 }
 
 export function useEmails(query: ListEmailsQuery) {

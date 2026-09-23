@@ -27,10 +27,7 @@ export interface ExtractedData {
   jobUrl: string | null;
 }
 
-/**
- * The classification port. Phase 5 ships rules; Phase 7 adds an AI implementation behind
- * the same interface (and a composite that only calls the AI when the rules are unsure).
- */
+/** Synchronous, local classifier (the rules). The pipeline uses EmailAnalyzer on top. */
 export abstract class EmailClassifier {
   abstract readonly id: string;
   abstract classify(email: PreparedEmail): Classification;

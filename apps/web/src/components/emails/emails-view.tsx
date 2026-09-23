@@ -161,7 +161,7 @@ export function EmailsView() {
                       <p className="truncate">{email.subject}</p>
                     </TableCell>
                     <TableCell>
-                      <CategoryBadge category={email.category} />
+                      <CategoryBadge category={email.category} classifier={email.classifier} />
                     </TableCell>
                     <TableCell className="hidden max-w-56 xl:table-cell">
                       <ApplicationLink email={email} />
@@ -188,7 +188,7 @@ export function EmailsView() {
                   <Sender email={email} />
                   <p className="line-clamp-2 text-sm">{email.subject}</p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <CategoryBadge category={email.category} />
+                    <CategoryBadge category={email.category} classifier={email.classifier} />
                     <span className="text-xs text-muted-foreground">
                       {formatDateTime(email.receivedAt)}
                     </span>

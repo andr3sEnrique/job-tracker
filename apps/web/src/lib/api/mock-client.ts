@@ -67,6 +67,7 @@ function mockEmails(): EmailSummary[] {
         applicationId: e.applicationId,
         applicationLabel: app ? `${app.company.name} · ${app.roleTitle}` : null,
         confidence: 0.85,
+        classifier: 'rules@2',
         gmailUrl: null,
       };
     }));
@@ -186,6 +187,18 @@ export const mockApiClient: ApiClient = {
       counts: { candidates: mockEmails().length, pending: 0, needsReview: 3, skipped: 312 },
       lastRun: null,
       lastAutomaticSyncAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+    }),
+
+  getAiStatus: () =>
+    delay({
+      enabled: true,
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5',
+      promptVersion: 'prompt-v1',
+      monthlyBudgetUsd: 1,
+      spentThisMonthUsd: 0.0132,
+      callsThisMonth: 9,
+      budgetExceeded: false,
     }),
 
   runSync: () =>
