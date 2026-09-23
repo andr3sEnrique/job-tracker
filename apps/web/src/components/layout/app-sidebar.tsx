@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/sidebar';
 import { API_MODE } from '@/lib/api';
 import { NAV_ITEMS, isNavItemActive } from './nav-items';
+import { UserMenu } from './user-menu';
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -67,9 +68,12 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          {API_MODE === 'mock' ? 'Datos de ejemplo (mock)' : 'Fase 2 · API local'}
-        </p>
+        {API_MODE === 'mock' && (
+          <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            Modo demo · datos en memoria
+          </p>
+        )}
+        <UserMenu />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

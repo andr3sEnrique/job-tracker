@@ -1,22 +1,25 @@
 import type { INestApplication } from '@nestjs/common';
-import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { createTestApp, resetDatabase } from './create-test-app.js';
+import { authedClient, createTestApp, login, resetDatabase } from './create-test-app.js';
+import type { FakeIdentityProvider } from './fake-identity-provider.js';
 
 describe('Statistics and health API', () => {
   let app: INestApplication;
   let prisma: PrismaService;
-  const http = () => request(app.getHttpServer());
+  let identity: FakeIdentityProvider;
+  let http: () => ReturnType<typeof authedClient>;
 
   beforeAll(async () => {
-    ({ app, prisma } = await createTestApp());
+    ({ app, prisma, identity } = await createTestApp());
   });
   afterAll(async () => {
     await app.close();
   });
   beforeEach(async () => {
     await resetDatabase(prisma);
+    const client = authedClient(app, await login(app, identity));
+    http = () => client;
   });
 
   it('returns an empty dashboard for a new user', async () => {

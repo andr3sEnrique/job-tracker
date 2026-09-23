@@ -2,6 +2,7 @@ import {
   applicationDetailSchema,
   applicationEventSchema,
   applicationSchema,
+  currentUserSchema,
   dashboardStatsSchema,
   paginatedSchema,
   toListApplicationsParams,
@@ -91,6 +92,12 @@ export const httpApiClient: ApiClient = {
       method: 'POST',
       ...json(input),
     }),
+
+  getCurrentUser: () => request('/auth/me', currentUserSchema),
+
+  async logout() {
+    await request('/auth/logout', null, { method: 'POST' });
+  },
 
   async deleteApplication(id) {
     await request(`/applications/${encodeURIComponent(id)}`, null, { method: 'DELETE' });

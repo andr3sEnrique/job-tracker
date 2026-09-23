@@ -6,4 +6,7 @@ import { inject } from 'vitest';
 process.env.DATABASE_URL = inject('databaseUrl');
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'error';
-process.env.OWNER_EMAIL = 'owner@test.local';
+process.env.FRONTEND_URL = 'http://localhost:3000';
+process.env.ALLOWED_GOOGLE_EMAILS = 'owner@test.local';
+// Every test logs in through the rate-limited auth endpoints (10/min in real use).
+process.env.AUTH_RATE_LIMIT_PER_MINUTE = '1000';

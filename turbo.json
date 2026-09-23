@@ -31,7 +31,17 @@
       "dependsOn": ["^build", "generate"],
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["NEXT_PUBLIC_*", "API_INTERNAL_URL", "OWNER_EMAIL", "PORT", "LOG_LEVEL"]
+      "passThroughEnv": [
+        "NEXT_PUBLIC_*",
+        "API_INTERNAL_URL",
+        "FRONTEND_URL",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "ALLOWED_GOOGLE_EMAILS",
+        "COOKIE_SECRET",
+        "PORT",
+        "LOG_LEVEL"
+      ]
     }
   }
 }

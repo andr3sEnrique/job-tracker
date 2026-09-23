@@ -5,6 +5,7 @@ import type {
   ApplicationEvent,
   ChangeStatusInput,
   CreateApplicationInput,
+  CurrentUser,
   DashboardStats,
   ListApplicationsQuery,
   Paginated,
@@ -26,4 +27,6 @@ export interface ApiClient {
   changeStatus(id: string, input: ChangeStatusInput): Promise<ApplicationDetail>;
   addNote(id: string, input: AddNoteInput): Promise<ApplicationEvent>;
   deleteApplication(id: string): Promise<void>;
+  getCurrentUser(): Promise<CurrentUser>;
+  logout(): Promise<void>;
 }

@@ -137,6 +137,11 @@ export const mockApiClient: ApiClient = {
       }),
     ),
 
+  getCurrentUser: () =>
+    delay({ id: 'mock-user', email: 'demo@example.com', name: 'Usuario demo', avatarUrl: null }),
+
+  logout: () => delay(undefined),
+
   deleteApplication(id) {
     const data = db();
     data.applications = data.applications.filter((a) => a.id !== id);

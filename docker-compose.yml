@@ -26,7 +26,10 @@ services:
       dockerfile: apps/api/Dockerfile
     environment:
       DATABASE_URL: postgresql://jat:jat@db:5432/job_tracker
-      OWNER_EMAIL: ${OWNER_EMAIL:-owner@example.com}
+      FRONTEND_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ALLOWED_GOOGLE_EMAILS: ${ALLOWED_GOOGLE_EMAILS:-}
       LOG_LEVEL: info
     ports:
       - '4000:4000'

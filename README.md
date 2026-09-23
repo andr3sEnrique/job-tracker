@@ -4,9 +4,8 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 2 (backend + base de datos).** Tracker manual completo: la web habla con una
-> API NestJS sobre PostgreSQL. La autenticación (fase 3) todavía no existe: **no despliegues la API
-> con datos reales** hasta entonces. Ver el [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 3 (autenticación).** Login con Google, sesiones en servidor y allowlist
+> validada en el backend en cada petición. Ver el [plan técnico](docs/PLAN_TECNICO.md).
 
 ## Stack
 
@@ -49,8 +48,11 @@ pnpm db:seed      # (opcional) carga 46 candidaturas de ejemplo
 - Web: http://localhost:3000
 - API: http://localhost:4000/api/v1 (health: `/api/v1/health/ready`)
 
-No hace falta `.env`: todas las variables tienen valores por defecto para desarrollo (ver
-[.env.example](.env.example)). Para trabajar solo en la UI sin API: `pnpm dev:mock`.
+Para iniciar sesión necesitas un cliente OAuth de Google y tu email en la allowlist: sigue
+[docs/setup-google-cloud.md](docs/setup-google-cloud.md) (5 minutos) y copia
+[.env.example](.env.example) a `.env`. El resto de variables tienen valores por defecto.
+
+Para trabajar solo en la UI, sin API ni login: `pnpm dev:mock`.
 
 ## Scripts
 
@@ -67,7 +69,7 @@ No hace falta `.env`: todas las variables tienen valores por defecto para desarr
 | `pnpm db:studio`        | Prisma Studio                                                        |
 | `pnpm format`           | Prettier                                                             |
 
-## API (fase 2)
+## API
 
 Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de `@jat/shared`.
 
@@ -83,16 +85,19 @@ Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de
 | GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                 |
 | GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                   |
 
-**Autorización provisional:** hasta la fase 3, un guard global asigna cada petición al usuario
-`OWNER_EMAIL`. El resto del código ya trabaja con `request.user` y filtra siempre por `userId`,
-así que la fase 3 solo sustituye ese guard.
+**Seguridad:** todas las rutas exigen sesión salvo `health` y el login (guard global que deniega
+por defecto). Las peticiones que modifican datos requieren además la cabecera
+`X-Requested-With` y un `Origin` válido (CSRF), y el login tiene rate limiting. Detalles en
+[docs/setup-google-cloud.md](docs/setup-google-cloud.md#cómo-se-protege-el-acceso).
 
 ## Cómo está organizada la web
 
 - **`src/lib/api`**: interfaz `ApiClient` con dos implementaciones: HTTP (valida cada respuesta
   con Zod) y mock en memoria (`NEXT_PUBLIC_API_MODE=mock`).
 - **Proxy**: `next.config.ts` reescribe `/api/*` hacia la API, así que el navegador solo habla con
-  un origen (sin CORS y con cookies de primera parte para la fase 3).
+  un origen (sin CORS y con la cookie de sesión como cookie de primera parte).
+- **`src/proxy.ts`**: redirige a `/login` si no hay cookie de sesión. Es solo UX; quien autoriza
+  es la API.
 - **`src/lib/mocks`**: dataset determinista y la lógica de filtrado y estadísticas, con tests.
   Sirve de referencia para los endpoints de la API.
 - **Estado en la URL**: filtros, orden y paginación de `/applications` viven en los search params,
@@ -102,8 +107,8 @@ así que la fase 3 solo sustituye ese guard.
 ## Roadmap
 
 1. ~~Foundation + frontend~~
-2. **Backend (NestJS) + base de datos** ← _actual_
-3. Autenticación (Google OAuth, allowlist en backend)
+2. ~~Backend (NestJS) + base de datos~~
+3. **Autenticación (Google OAuth, allowlist en backend)** ← _actual_
 4. Integración con Gmail
 5. Clasificación de emails (reglas)
 6. Sincronización automática

@@ -8,6 +8,7 @@ import type {
   UpdateApplicationInput,
 } from '@jat/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { api } from '.';
 
 export const queryKeys = {
@@ -15,7 +16,28 @@ export const queryKeys = {
   applicationList: (query: ListApplicationsQuery) => ['applications', 'list', query] as const,
   application: (id: string) => ['applications', 'detail', id] as const,
   dashboard: ['stats', 'dashboard'] as const,
+  me: ['auth', 'me'] as const,
 };
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: queryKeys.me,
+    queryFn: () => api.getCurrentUser(),
+    staleTime: Infinity,
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: () => api.logout(),
+    onSettled: () => {
+      queryClient.clear(); // drop every cached response that belonged to this session
+      router.replace('/login');
+    },
+  });
+}
 
 export function useApplications(query: ListApplicationsQuery) {
   return useQuery({

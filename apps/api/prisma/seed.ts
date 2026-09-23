@@ -1,5 +1,6 @@
 /**
- * Loads the deterministic sample dataset for the owner user.
+ * Loads the deterministic sample dataset for the account you log in with
+ * (SEED_USER_EMAIL, or the first ALLOWED_GOOGLE_EMAILS entry).
  *   pnpm db:seed          → only if the owner has no applications yet
  *   pnpm db:seed --force  → wipes the owner's data first
  */
@@ -12,7 +13,13 @@ import { normalizeCompanyName } from '../src/applications/company-name.js';
 config({ path: new URL('../../../.env', import.meta.url), quiet: true });
 
 const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://jat:jat@localhost:5432/job_tracker';
-const ownerEmail = process.env.OWNER_EMAIL ?? 'owner@example.com';
+const ownerEmail = (
+  process.env.SEED_USER_EMAIL ??
+  process.env.ALLOWED_GOOGLE_EMAILS?.split(',')[0] ??
+  'owner@example.com'
+)
+  .trim()
+  .toLowerCase();
 const force = process.argv.includes('--force');
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });

@@ -2,13 +2,13 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ApplicationsModule } from './applications/applications.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { PrismaExceptionFilter } from './common/prisma-exception.filter.js';
 import { AppConfig } from './config/app-config.service.js';
 import { ConfigModule } from './config/config.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StatisticsModule } from './statistics/statistics.module.js';
-import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -42,7 +42,7 @@ import { UsersModule } from './users/users.module.js';
       }),
     }),
     PrismaModule,
-    UsersModule,
+    AuthModule,
     ApplicationsModule,
     StatisticsModule,
     HealthModule,
