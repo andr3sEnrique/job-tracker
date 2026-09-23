@@ -4,6 +4,9 @@ import {
   applicationSchema,
   currentUserSchema,
   dashboardStatsSchema,
+  emailSummarySchema,
+  gmailStatusSchema,
+  syncResultSchema,
   paginatedSchema,
   toListApplicationsParams,
 } from '@jat/shared';
@@ -97,6 +100,23 @@ export const httpApiClient: ApiClient = {
 
   async logout() {
     await request('/auth/logout', null, { method: 'POST' });
+  },
+
+  getGmailStatus: () => request('/gmail/status', gmailStatusSchema),
+
+  runSync: () => request('/sync/run', syncResultSchema, { method: 'POST' }),
+
+  async disconnectGmail() {
+    await request('/gmail', null, { method: 'DELETE' });
+  },
+
+  listEmails: (query) => {
+    const params = new URLSearchParams({
+      page: String(query.page),
+      pageSize: String(query.pageSize),
+    });
+    if (query.status?.length) params.set('status', query.status.join(','));
+    return request(`/emails?${params}`, paginatedSchema(emailSummarySchema));
   },
 
   async deleteApplication(id) {

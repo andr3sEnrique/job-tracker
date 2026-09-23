@@ -13,7 +13,7 @@ import {
 } from './cookies.js';
 import { SessionsService } from './sessions.service.js';
 
-function parseOAuthState(raw: unknown): OAuthState | null {
+export function parseOAuthState(raw: unknown): OAuthState | null {
   if (typeof raw !== 'string') return null; // unsigned or tampered cookies come back as false
   try {
     const value = JSON.parse(raw) as Partial<OAuthState>;

@@ -26,8 +26,34 @@ describe('validateEnv', () => {
     );
   });
 
+  const prodBase = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://u:p@db:5432/app',
+    COOKIE_SECRET: 'x'.repeat(40),
+    GOOGLE_CLIENT_ID: 'id',
+    GOOGLE_CLIENT_SECRET: 'secret',
+    ALLOWED_GOOGLE_EMAILS: 'me@example.com',
+    TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+    FRONTEND_URL: 'https://app.example.com',
+  };
+
+  it('requires a 32-byte token encryption key in production', () => {
+    expect(() => validateEnv({ ...prodBase, TOKEN_ENCRYPTION_KEY: undefined })).toThrow(
+      /TOKEN_ENCRYPTION_KEY/,
+    );
+    expect(() => validateEnv({ ...prodBase, TOKEN_ENCRYPTION_KEY: 'c2hvcnQ=' })).toThrow(
+      /32 bytes/,
+    );
+    expect(validateEnv(prodBase).TOKEN_ENCRYPTION_KEY).toBe(prodBase.TOKEN_ENCRYPTION_KEY);
+  });
+
+  it('forbids the fake mail provider in production', () => {
+    expect(() => validateEnv({ ...prodBase, MAIL_PROVIDER: 'fake' })).toThrow(/MAIL_PROVIDER/);
+  });
+
   it('requires https in production and enables secure cookies', () => {
     const base = {
+      TOKEN_ENCRYPTION_KEY: prodBase.TOKEN_ENCRYPTION_KEY,
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://u:p@db:5432/app',
       COOKIE_SECRET: 'x'.repeat(40),

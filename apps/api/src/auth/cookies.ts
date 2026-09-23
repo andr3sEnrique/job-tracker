@@ -2,6 +2,9 @@ import type { CookieOptions } from 'express';
 
 export const OAUTH_COOKIE = 'jat_oauth';
 export const OAUTH_COOKIE_PATH = '/api/v1/auth';
+/** Same mechanism for the separate "connect Gmail" authorization. */
+export const GMAIL_OAUTH_COOKIE = 'jat_gmail_oauth';
+export const GMAIL_OAUTH_COOKIE_PATH = '/api/v1/gmail';
 export const OAUTH_COOKIE_MAX_AGE_MS = 10 * 60 * 1000;
 
 /**
@@ -22,13 +25,13 @@ export function sessionCookieOptions(secure: boolean, maxAgeMs: number): CookieO
   };
 }
 
-export function oauthCookieOptions(secure: boolean): CookieOptions {
+export function oauthCookieOptions(secure: boolean, path = OAUTH_COOKIE_PATH): CookieOptions {
   return {
     httpOnly: true,
     secure,
     // Lax (not Strict): it must travel on the top-level redirect back from Google.
     sameSite: 'lax',
-    path: OAUTH_COOKIE_PATH,
+    path,
     maxAge: OAUTH_COOKIE_MAX_AGE_MS,
     signed: true,
   };

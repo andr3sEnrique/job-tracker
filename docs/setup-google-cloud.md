@@ -1,6 +1,7 @@
-# Google Cloud: OAuth para el login
+# Google Cloud: login y acceso a Gmail
 
-Configuración única para que "Continuar con Google" funcione. Es gratis y no requiere tarjeta.
+Configuración única para que funcionen "Continuar con Google" (fase 3) y "Conectar Gmail" (fase 4).
+Es gratis y no requiere tarjeta.
 
 ## 1. Proyecto
 
@@ -24,7 +25,9 @@ Configuración única para que "Continuar con Google" funcione. Es gratis y no r
 1. **Credenciales → Crear credenciales → ID de cliente de OAuth**.
 2. Tipo: **Aplicación web**.
 3. **Orígenes de JavaScript autorizados**: `http://localhost:3000`
-4. **URIs de redirección autorizados**: `http://localhost:3000/api/v1/auth/google/callback`
+4. **URIs de redirección autorizados** (las dos):
+   - `http://localhost:3000/api/v1/auth/google/callback` (login)
+   - `http://localhost:3000/api/v1/gmail/callback` (conectar Gmail)
 5. Crea y copia el _Client ID_ y el _Client secret_.
 
 La redirección apunta a la **web** (puerto 3000), no a la API: el callback pasa por el proxy
@@ -34,7 +37,27 @@ Para producción crea **otro cliente** con el dominio real (por ejemplo
 `https://job-tracker.vercel.app/api/v1/auth/google/callback`). Tener clientes separados evita
 que credenciales de desarrollo sirvan en producción.
 
-## 4. Variables de entorno
+## 4. Acceso a Gmail (fase 4)
+
+1. **APIs y servicios → Biblioteca** → busca **Gmail API** → **Habilitar**.
+2. **Google Auth Platform → Data Access → Add or remove scopes** → añade
+   `https://www.googleapis.com/auth/gmail.readonly` (solo lectura) → guarda.
+3. **Google Auth Platform → Audience → Publish app** → confirma. El estado pasa a
+   **In production**.
+
+¿Por qué publicar? `gmail.readonly` es un scope _restringido_. En modo **Testing**, Google caduca
+los refresh tokens a los 7 días y la sincronización dejaría de funcionar cada semana. Una app
+personal (menos de 100 usuarios que conoces) puede estar en producción **sin verificación**;
+la verificación formal de scopes restringidos exige una auditoría de pago que no hace falta.
+
+La consecuencia es que, al conectar Gmail, Google muestra **"Google no ha verificado esta app"**.
+Es esperado: pulsa **Configuración avanzada → Ir a job-tracker (no seguro)**. Aunque la app sea
+"pública", nadie más puede usarla: la API rechaza cualquier cuenta fuera de la allowlist.
+
+En la pantalla de permisos, **marca la casilla de lectura de Gmail**: Google permite desmarcar
+scopes y, sin ese permiso, la conexión se rechaza.
+
+## 5. Variables de entorno
 
 En el `.env` de la raíz del repositorio:
 
@@ -42,6 +65,9 @@ En el `.env` de la raíz del repositorio:
 GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxx
 ALLOWED_GOOGLE_EMAILS=tu.email@gmail.com
+# Cifra el refresh token de Gmail en la base de datos (openssl rand -base64 32).
+# En desarrollo hay una clave por defecto; en producción es obligatoria.
+TOKEN_ENCRYPTION_KEY=
 ```
 
 Reinicia `pnpm dev`. Si quieres ver los datos de ejemplo con tu cuenta:
@@ -49,6 +75,17 @@ Reinicia `pnpm dev`. Si quieres ver los datos de ejemplo con tu cuenta:
 ```bash
 pnpm db:seed -- --force
 ```
+
+## Qué se guarda de tu correo
+
+- Se listan solo los mensajes que coinciden con remitentes de ATS/portales de empleo o con
+  palabras clave en el asunto, de los últimos 180 días (`GMAIL_INITIAL_SYNC_DAYS`).
+- De los relevantes se guarda **remitente, asunto, fecha, etiquetas y el Message-ID**. Nunca el
+  cuerpo, adjuntos ni destinatarios.
+- De los descartados solo quedan los identificadores y la fecha (para no volver a procesarlos).
+- "Desconectar" revoca el acceso en Google y borra todo lo anterior.
+
+Para desarrollar sin tocar tu buzón real: `MAIL_PROVIDER=fake` sirve 240 emails sintéticos.
 
 ## Cómo se protege el acceso
 
@@ -60,3 +97,5 @@ pnpm db:seed -- --force
 - La sesión es un token aleatorio en una cookie `HttpOnly`, `SameSite=Lax` (y `Secure` +
   prefijo `__Host-` en HTTPS). En la base de datos solo se guarda su hash SHA-256.
 - Todas las rutas de la API exigen sesión salvo las marcadas `@Public()` (health y login).
+- El refresh token de Gmail se cifra con AES-256-GCM, ligado al usuario propietario; los
+  access tokens duran una hora y nunca se guardan ni llegan al navegador.

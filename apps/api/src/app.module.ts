@@ -6,6 +6,10 @@ import { AuthModule } from './auth/auth.module.js';
 import { PrismaExceptionFilter } from './common/prisma-exception.filter.js';
 import { AppConfig } from './config/app-config.service.js';
 import { ConfigModule } from './config/config.module.js';
+import { CryptoModule } from './crypto/crypto.module.js';
+import { EmailsModule } from './emails/emails.module.js';
+import { GmailModule } from './gmail/gmail.module.js';
+import { SyncModule } from './sync/sync.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { StatisticsModule } from './statistics/statistics.module.js';
@@ -42,9 +46,13 @@ import { StatisticsModule } from './statistics/statistics.module.js';
       }),
     }),
     PrismaModule,
+    CryptoModule,
     AuthModule,
     ApplicationsModule,
     StatisticsModule,
+    GmailModule,
+    EmailsModule,
+    SyncModule,
     HealthModule,
   ],
   providers: [{ provide: APP_FILTER, useClass: PrismaExceptionFilter }],

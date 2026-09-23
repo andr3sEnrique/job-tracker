@@ -4,6 +4,8 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { IdentityProvider } from '../src/auth/identity-provider.js';
 import { configureApp } from '../src/configure-app.js';
+import { FakeMailProvider } from '../src/gmail/fake-mail.provider.js';
+import { MailProvider } from '../src/gmail/mail-provider.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { FakeIdentityProvider } from './fake-identity-provider.js';
 
@@ -11,9 +13,12 @@ export const OWNER_EMAIL = 'owner@test.local';
 
 export async function createTestApp() {
   const identity = new FakeIdentityProvider();
+  const mail = new FakeMailProvider();
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(IdentityProvider)
     .useValue(identity)
+    .overrideProvider(MailProvider)
+    .useValue(mail)
     .compile();
   const app = configureApp(moduleRef.createNestApplication({ logger: false }));
   await app.init();
@@ -25,11 +30,11 @@ export async function createTestApp() {
     throw new Error('Integration tests must not run against the dev database');
   }
 
-  return { app, prisma, identity };
+  return { app, prisma, identity, mail };
 }
 
 export async function resetDatabase(prisma: PrismaService) {
-  await prisma.$executeRaw`TRUNCATE sessions, application_events, applications, companies, users CASCADE`;
+  await prisma.$executeRaw`TRUNCATE sessions, application_events, applications, companies, users, gmail_connections CASCADE`;
 }
 
 export function cookieValue(res: request.Response, name: string): string | undefined {

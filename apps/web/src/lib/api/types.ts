@@ -6,6 +6,10 @@ import type {
   ChangeStatusInput,
   CreateApplicationInput,
   CurrentUser,
+  EmailSummary,
+  GmailStatus,
+  ListEmailsQuery,
+  SyncResult,
   DashboardStats,
   ListApplicationsQuery,
   Paginated,
@@ -29,4 +33,8 @@ export interface ApiClient {
   deleteApplication(id: string): Promise<void>;
   getCurrentUser(): Promise<CurrentUser>;
   logout(): Promise<void>;
+  getGmailStatus(): Promise<GmailStatus>;
+  runSync(): Promise<SyncResult>;
+  disconnectGmail(): Promise<void>;
+  listEmails(query: ListEmailsQuery): Promise<Paginated<EmailSummary>>;
 }

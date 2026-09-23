@@ -1,4 +1,9 @@
-import { generateSampleDataset, type Application, type ApplicationEvent } from '@jat/shared';
+import {
+  generateSampleDataset,
+  type Application,
+  type ApplicationEvent,
+  type EmailSummary,
+} from '@jat/shared';
 import type { ApiClient } from './types';
 import { queryApplications } from '../mocks/query';
 import {
@@ -38,6 +43,31 @@ function pushEvent(event: Omit<ApplicationEvent, 'id'>): ApplicationEvent {
   const created = { ...event, id: newId() };
   db().events.push(created);
   return created;
+}
+
+let emails: EmailSummary[] | undefined;
+/** Email metadata derived from the sample events, as the Gmail sync would store it. */
+function mockEmails(): EmailSummary[] {
+  return (emails ??= db()
+    .events.filter((e) => e.source === 'EMAIL')
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, 60)
+    .map((e) => {
+      const app = db().applications.find((a) => a.id === e.applicationId);
+      const domain = app?.company.domain ?? 'example.com';
+      return {
+        id: e.id,
+        fromName: app ? `${app.company.name} Talent` : null,
+        fromEmail: `careers@${domain}`,
+        subject: e.summary ?? 'Actualización de tu candidatura',
+        receivedAt: e.occurredAt,
+        processingStatus: 'PENDING' as const,
+        category: null,
+        prefilterReason: 'subject:candidatura',
+        applicationId: null,
+        gmailUrl: null,
+      };
+    }));
 }
 
 export const mockApiClient: ApiClient = {
@@ -141,6 +171,49 @@ export const mockApiClient: ApiClient = {
     delay({ id: 'mock-user', email: 'demo@example.com', name: 'Usuario demo', avatarUrl: null }),
 
   logout: () => delay(undefined),
+
+  getGmailStatus: () =>
+    delay({
+      connected: true as const,
+      googleEmail: 'demo@gmail.com',
+      status: 'ACTIVE' as const,
+      connectedAt: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+      lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
+      initialSyncCompleted: true,
+      syncWindowDays: 180,
+      counts: { candidates: mockEmails().length, pending: mockEmails().length, skipped: 312 },
+      lastRun: null,
+    }),
+
+  runSync: () =>
+    delay({
+      hasMore: false,
+      run: {
+        id: 'mock-run',
+        type: 'MANUAL' as const,
+        status: 'SUCCESS' as const,
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        messagesListed: 0,
+        candidates: 0,
+        skipped: 0,
+        failed: 0,
+        errorCode: null,
+      },
+    }),
+
+  disconnectGmail: () => delay(undefined),
+
+  listEmails: (query) => {
+    const all = mockEmails();
+    const start = (query.page - 1) * query.pageSize;
+    return delay({
+      items: all.slice(start, start + query.pageSize),
+      total: all.length,
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+  },
 
   deleteApplication(id) {
     const data = db();

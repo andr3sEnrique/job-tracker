@@ -4,8 +4,9 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 3 (autenticación).** Login con Google, sesiones en servidor y allowlist
-> validada en el backend en cada petición. Ver el [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 4 (integración con Gmail).** Conexión de solo lectura con Gmail, sincronización
+> inicial por tramos y almacenamiento de metadatos (nunca el contenido de los emails). La
+> clasificación automática llega en la fase 5. Ver el [plan técnico](docs/PLAN_TECNICO.md).
 
 ## Stack
 
@@ -108,8 +109,8 @@ por defecto). Las peticiones que modifican datos requieren además la cabecera
 
 1. ~~Foundation + frontend~~
 2. ~~Backend (NestJS) + base de datos~~
-3. **Autenticación (Google OAuth, allowlist en backend)** ← _actual_
-4. Integración con Gmail
+3. ~~Autenticación (Google OAuth, allowlist en backend)~~
+4. **Integración con Gmail** ← _actual_
 5. Clasificación de emails (reglas)
 6. Sincronización automática
 7. Extracción con IA

@@ -1,4 +1,4 @@
-import { Briefcase, Inbox, LayoutDashboard, Settings, type LucideIcon } from 'lucide-react';
+import { Briefcase, LayoutDashboard, Mail, Settings, type LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   title: string;
@@ -9,7 +9,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { title: 'Resumen', href: '/', icon: LayoutDashboard },
   { title: 'Candidaturas', href: '/applications', icon: Briefcase },
-  { title: 'Revisión', href: '/review', icon: Inbox },
+  { title: 'Emails', href: '/emails', icon: Mail },
   { title: 'Ajustes', href: '/settings', icon: Settings },
 ];
 

@@ -1,5 +1,4 @@
 // Data model — see docs/PLAN_TECNICO.md §4.
-// Gmail-related tables (gmail_connections, emails, email_threads, sync_runs) arrive in Phase 4.
 
 generator client {
   provider            = "prisma-client"
@@ -71,6 +70,48 @@ enum EventSource {
   SYSTEM
 }
 
+enum GmailConnectionStatus {
+  ACTIVE
+  NEEDS_REAUTH
+  REVOKED
+  ERROR
+}
+
+enum SyncRunType {
+  INITIAL
+  INCREMENTAL
+  MANUAL
+  FALLBACK
+}
+
+enum SyncRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum EmailCategory {
+  APPLICATION_SUBMITTED
+  APPLICATION_CONFIRMATION
+  RECRUITER_REPLY
+  INTERVIEW
+  TECHNICAL_INTERVIEW
+  REJECTION
+  OFFER
+  JOB_ALERT
+  IRRELEVANT
+  UNKNOWN
+}
+
+enum EmailProcessingStatus {
+  PENDING
+  PROCESSED
+  SKIPPED
+  NEEDS_REVIEW
+  FAILED
+}
+
 model User {
   id          String    @id @default(uuid(7)) @db.Uuid
   /// Stable Google account id. Null until the user logs in with Google (Phase 3).
@@ -82,8 +123,9 @@ model User {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  sessions     Session[]
-  companies    Company[]
+  sessions         Session[]
+  gmailConnections GmailConnection[]
+  companies        Company[]
   applications Application[]
 
   @@map("users")
@@ -154,6 +196,8 @@ model Application {
   user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   company Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
   events  ApplicationEvent[]
+  threads EmailThread[]
+  emails  Email[]
 
   @@index([userId, status])
   @@index([userId, appliedAt(sort: Desc)])
@@ -181,4 +225,116 @@ model ApplicationEvent {
   @@index([applicationId, occurredAt(sort: Desc)])
   @@index([occurredAt(sort: Desc)])
   @@map("application_events")
+}
+
+/// One authorised Gmail mailbox. The refresh token is encrypted (AES-256-GCM); access
+/// tokens are short-lived and never stored.
+model GmailConnection {
+  id                     String                @id @default(uuid(7)) @db.Uuid
+  userId                 String                @map("user_id") @db.Uuid
+  googleEmail            String                @map("google_email")
+  scopes                 String[]
+  refreshTokenEnc        String                @map("refresh_token_enc")
+  keyVersion             Int                   @map("key_version")
+  status                 GmailConnectionStatus @default(ACTIVE)
+  /// Gmail history cursor for incremental sync (Phase 6). Captured before the initial sync.
+  lastHistoryId          String?               @map("last_history_id")
+  lastSyncedAt           DateTime?             @map("last_synced_at") @db.Timestamptz(3)
+  initialSyncCompletedAt DateTime?             @map("initial_sync_completed_at") @db.Timestamptz(3)
+  /// Lease that prevents two syncs (cron + manual) from running at the same time.
+  syncLockedUntil        DateTime?             @map("sync_locked_until") @db.Timestamptz(3)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncRuns SyncRun[]
+  threads  EmailThread[]
+  emails   Email[]
+
+  @@unique([userId, googleEmail])
+  @@map("gmail_connections")
+}
+
+model SyncRun {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  connectionId   String        @map("connection_id") @db.Uuid
+  type           SyncRunType
+  status         SyncRunStatus @default(RUNNING)
+  startedAt      DateTime      @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?     @map("finished_at") @db.Timestamptz(3)
+  /// Checkpoint: where to resume a chunked initial sync.
+  pageToken      String?       @map("page_token")
+  messagesListed Int           @default(0) @map("messages_listed")
+  candidates     Int           @default(0)
+  skipped        Int           @default(0)
+  failed         Int           @default(0)
+  /// A code, never a raw provider message (it could contain personal data).
+  errorCode      String?       @map("error_code")
+
+  connection GmailConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, startedAt(sort: Desc)])
+  @@map("sync_runs")
+}
+
+model EmailThread {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  connectionId   String    @map("connection_id") @db.Uuid
+  gmailThreadId  String    @map("gmail_thread_id")
+  /// The most reliable signal for matching follow-up emails to an application (Phase 5).
+  applicationId  String?   @map("application_id") @db.Uuid
+  firstMessageAt DateTime  @map("first_message_at") @db.Timestamptz(3)
+  lastMessageAt  DateTime  @map("last_message_at") @db.Timestamptz(3)
+  messageCount   Int       @default(0) @map("message_count")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  connection  GmailConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  application Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  emails      Email[]
+
+  @@unique([connectionId, gmailThreadId])
+  @@index([applicationId])
+  @@map("email_threads")
+}
+
+/// Email METADATA only. Bodies, HTML, attachments and recipients are never stored:
+/// Gmail stays the source of truth and messages can be re-fetched by id.
+/// Rows discarded by the prefilter keep only ids and date (no sender, no subject).
+model Email {
+  id               String                @id @default(uuid(7)) @db.Uuid
+  connectionId     String                @map("connection_id") @db.Uuid
+  threadId         String                @map("thread_id") @db.Uuid
+  /// Idempotency key: the same message is never stored or processed twice.
+  gmailMessageId   String                @map("gmail_message_id")
+  rfc822MessageId  String?               @map("rfc822_message_id")
+  fromEmail        String?               @map("from_email")
+  fromName         String?               @map("from_name")
+  fromDomain       String?               @map("from_domain")
+  subject          String?
+  receivedAt       DateTime              @map("received_at") @db.Timestamptz(3)
+  gmailLabels      String[]              @default([]) @map("gmail_labels")
+  prefilterReason  String?               @map("prefilter_reason")
+  category         EmailCategory?
+  confidence       Float?
+  classifier       String?
+  extracted        Json?
+  processingStatus EmailProcessingStatus @default(PENDING) @map("processing_status")
+  attempts         Int                   @default(0)
+  nextAttemptAt    DateTime?             @map("next_attempt_at") @db.Timestamptz(3)
+  errorCode        String?               @map("error_code")
+  applicationId    String?               @map("application_id") @db.Uuid
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  connection  GmailConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  thread      EmailThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  application Application?    @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, gmailMessageId])
+  @@index([connectionId, processingStatus, nextAttemptAt])
+  @@index([connectionId, receivedAt(sort: Desc)])
+  @@index([fromDomain])
+  @@index([applicationId])
+  @@map("emails")
 }

@@ -5,6 +5,7 @@ import type {
   ChangeStatusInput,
   CreateApplicationInput,
   ListApplicationsQuery,
+  ListEmailsQuery,
   UpdateApplicationInput,
 } from '@jat/shared';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +18,33 @@ export const queryKeys = {
   application: (id: string) => ['applications', 'detail', id] as const,
   dashboard: ['stats', 'dashboard'] as const,
   me: ['auth', 'me'] as const,
+  gmailStatus: ['gmail', 'status'] as const,
+  emails: (query: ListEmailsQuery) => ['emails', query] as const,
 };
+
+export function useGmailStatus() {
+  return useQuery({ queryKey: queryKeys.gmailStatus, queryFn: () => api.getGmailStatus() });
+}
+
+export function useEmails(query: ListEmailsQuery) {
+  return useQuery({
+    queryKey: queryKeys.emails(query),
+    queryFn: () => api.listEmails(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useDisconnectGmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.disconnectGmail(),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['gmail'] }),
+        queryClient.invalidateQueries({ queryKey: ['emails'] }),
+      ]),
+  });
+}
 
 export function useCurrentUser() {
   return useQuery({
