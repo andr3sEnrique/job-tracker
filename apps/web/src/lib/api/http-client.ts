@@ -35,10 +35,20 @@ async function request<T extends z.ZodType>(
     ...init,
     headers: {
       Accept: 'application/json',
+      // Required by the API's CSRF guard on state-changing requests.
+      'X-Requested-With': 'fetch',
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
     },
     credentials: 'same-origin',
   });
+
+  if (response.status === 401 && typeof window !== 'undefined') {
+    // Session missing, expired or revoked: back to the login page. A full navigation (not
+    // the router) on purpose: this runs outside React and must drop all in-memory state.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign('/login?error=session');
+    throw new ApiError(401, 'Sesión caducada');
+  }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {
