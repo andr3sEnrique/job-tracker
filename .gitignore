@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# builds
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# turbo
+.turbo/
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# env — only .env.example is committed
+.env
+.env.*
+!.env.example
+
+# misc
+.DS_Store
+*.pem
+*.log
+.vercel
+
+# local tooling
+.claude/

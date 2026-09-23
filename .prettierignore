@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+.next
+dist
+coverage
+.turbo
+docs/PLAN_TECNICO.md
+apps/web/AGENTS.md

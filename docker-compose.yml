@@ -1,0 +1,22 @@
+# Local infrastructure. Apps run natively (`pnpm dev`) for fast hot reload.
+# Phase 2 adds a `full` profile that also runs api and web in containers.
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: jat-postgres
+    environment:
+      POSTGRES_USER: jat
+      POSTGRES_PASSWORD: jat
+      POSTGRES_DB: job_tracker
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jat -d job_tracker']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
