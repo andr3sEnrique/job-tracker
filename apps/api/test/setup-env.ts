@@ -15,3 +15,4 @@ process.env.MAIL_PROVIDER = 'fake';
 // One page per sync call, so the tests exercise chunking and resuming.
 process.env.SYNC_PAGE_SIZE = '100';
 process.env.SYNC_TIME_BUDGET_MS = '0';
+process.env.CRON_SECRET = 'test-cron-secret-0123456789abcdef0123456789';

@@ -12,8 +12,10 @@ import {
 import {
   GMAIL_READONLY_SCOPE,
   MailAuthError,
+  MailHistoryExpiredError,
   MailProvider,
   type ConnectResult,
+  type HistoryPage,
   type MessageContent,
   type MessageMetadata,
 } from './mail-provider.js';
@@ -91,12 +93,54 @@ export function generateFakeMailbox(count = 240, now = new Date()): FakeMessage[
 @Injectable()
 export class FakeMailProvider extends MailProvider {
   readonly name = 'fake' as const;
-  mailbox: FakeMessage[] = generateFakeMailbox();
   readonly revoked: string[] = [];
   /** When set, every call fails as if Google had revoked the grant. */
   failWithAuthError = false;
   private readonly challenges = new Set<string>();
   private issued = 0;
+
+  // History: every message gets an increasing history id the first time the provider
+  // sees it, so tests can add mail by pushing to `mailbox` or calling deliver(). Like
+  // Gmail's, the log keeps messages that were deleted afterwards.
+  private messages: FakeMessage[] = generateFakeMailbox();
+  private readonly historyIds = new Map<string, number>();
+  private history: { id: string; threadId: string; labels: string[]; historyId: number }[] = [];
+  private historyCounter = 1000;
+  private historyFloor = 0;
+
+  get mailbox(): FakeMessage[] {
+    return this.messages;
+  }
+
+  /** Replacing the mailbox starts a new history. */
+  set mailbox(messages: FakeMessage[]) {
+    this.messages = messages;
+    this.historyIds.clear();
+    this.history = [];
+    this.historyCounter = 1000;
+    this.historyFloor = 0;
+  }
+
+  /** A new message arrives (newest first, like Gmail). */
+  deliver(message: FakeMessage) {
+    this.messages.unshift(message);
+  }
+
+  /** Forgets all history so far, like Gmail after about a week: every known id is too old. */
+  expireHistory() {
+    this.stampHistory();
+    this.historyFloor = ++this.historyCounter;
+  }
+
+  private stampHistory() {
+    const unseen = this.messages
+      .filter((m) => !this.historyIds.has(m.id))
+      .sort((a, b) => a.receivedAt.getTime() - b.receivedAt.getTime());
+    for (const { id, threadId, labels } of unseen) {
+      this.historyIds.set(id, ++this.historyCounter);
+      this.history.push({ id, threadId, labels, historyId: this.historyCounter });
+    }
+  }
 
   buildConnectUrl({ state, codeChallenge }: { state: string; codeChallenge: string }) {
     this.challenges.add(codeChallenge);
@@ -124,7 +168,30 @@ export class FakeMailProvider extends MailProvider {
 
   async getHistoryId() {
     this.check();
-    return String(1000 + this.mailbox.length);
+    this.stampHistory();
+    return String(this.historyCounter);
+  }
+
+  async listHistory(
+    _token: string,
+    {
+      startHistoryId,
+      pageToken,
+      pageSize,
+    }: { startHistoryId: string; pageToken?: string; pageSize: number },
+  ): Promise<HistoryPage> {
+    this.check();
+    this.stampHistory();
+    const start = Number(startHistoryId);
+    if (start < this.historyFloor) throw new MailHistoryExpiredError('History expired');
+    const added = this.history.filter((h) => h.historyId > start);
+    const offset = pageToken ? Number(pageToken) : 0;
+    const page = added.slice(offset, offset + pageSize);
+    return {
+      messages: page.map(({ id, threadId, labels }) => ({ id, threadId, labels })),
+      nextPageToken: offset + pageSize < added.length ? String(offset + pageSize) : undefined,
+      historyId: String(this.historyCounter),
+    };
   }
 
   async listMessages(

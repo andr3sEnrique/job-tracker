@@ -54,6 +54,17 @@ export const envSchema = z
     SYNC_PAGE_SIZE: z.coerce.number().int().min(1).max(500).default(100),
     /** A sync request stops after this long and reports `hasMore` (free hosts time out). */
     SYNC_TIME_BUDGET_MS: z.coerce.number().int().min(0).default(20_000),
+
+    /**
+     * Shared secret for `POST /internal/sync`, called by an external cron (free hosts sleep,
+     * so an in-process timer alone is not enough). Unset disables the endpoint.
+     */
+    CRON_SECRET: z.string().min(32).optional(),
+    /** In-process timer: for an always-on host or local development. */
+    SCHEDULER_ENABLED: z.stringbool().default(false),
+    SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+    /** APPLIED/SCREENING applications without activity for this long become GHOSTED. */
+    GHOSTED_AFTER_DAYS: z.coerce.number().int().min(7).max(365).default(30),
   })
   .transform((env, ctx) => {
     const isProd = env.NODE_ENV === 'production';

@@ -66,6 +66,21 @@ export async function login(
   return `jat_session=${session}`;
 }
 
+/** Runs the Gmail connect flow against the fake mail provider. */
+export async function connectGmail(app: INestApplication, cookie: string) {
+  const server = app.getHttpServer();
+  const start = await request(server)
+    .get('/api/v1/gmail/connect')
+    .set('Cookie', cookie)
+    .expect(302);
+  const callback = new URL(start.headers.location as string, 'http://localhost');
+  const oauth = cookieValue(start, 'jat_gmail_oauth');
+  await request(server)
+    .get(`${callback.pathname}${callback.search}`)
+    .set('Cookie', `${cookie}; jat_gmail_oauth=${oauth}`)
+    .expect(302);
+}
+
 /** Supertest bound to a session, with the CSRF header the web client always sends. */
 export function authedClient(app: INestApplication, cookie: string) {
   const server = app.getHttpServer();

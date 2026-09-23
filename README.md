@@ -4,10 +4,11 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 5 (clasificación).** Los emails de Gmail se clasifican con reglas (EN/FR/ES) y
-> crean o actualizan candidaturas y su historial automáticamente; los casos dudosos van a una
-> bandeja de revisión. El contenido de los emails nunca se guarda. Ver el
-> [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 6 (sincronización automática).** Los emails de Gmail se clasifican con reglas
+> (EN/FR/ES) y crean o actualizan candidaturas y su historial; los casos dudosos van a una bandeja
+> de revisión. Tras la carga inicial, la sincronización es incremental (Gmail History API) y se
+> lanza sola desde un cron externo o un temporizador interno. El contenido de los emails nunca se
+> guarda. Ver el [plan técnico](docs/PLAN_TECNICO.md).
 
 ## Stack
 
@@ -90,13 +91,15 @@ Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de
 | GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync         |
 | DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados          |
 | POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)      |
+| POST   | `/internal/sync`                | Sync de todos los buzones + mantenimiento (cron)       |
 | GET    | `/emails`                       | Emails relevantes, su clasificación y candidatura      |
 | POST   | `/emails/:id/resolve`           | Revisión: confirmar, ignorar, asignar o crear          |
 | POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual) |
 | GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                        |
 
-**Seguridad:** todas las rutas exigen sesión salvo `health` y el login (guard global que deniega
-por defecto). Las peticiones que modifican datos requieren además la cabecera
+**Seguridad:** todas las rutas exigen sesión salvo `health`, el login y `/internal/sync` (guard
+global que deniega por defecto). `/internal/sync` no usa cookies: exige la cabecera
+`X-Cron-Secret` (comparada en tiempo constante) y no existe si `CRON_SECRET` no está definido. Las peticiones que modifican datos requieren además la cabecera
 `X-Requested-With` y un `Origin` válido (CSRF), y el login tiene rate limiting. Detalles en
 [docs/setup-google-cloud.md](docs/setup-google-cloud.md#cómo-se-protege-el-acceso).
 
@@ -122,6 +125,27 @@ Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
   empresa y puesto esperados; `dataset.spec.ts` exige acertarlos todos. Cuando un email real se
   clasifique mal, se añade aquí una versión anonimizada.
 
+## Sincronización automática
+
+| Tipo          | Cuándo                                                  | Cómo                                    |
+| ------------- | ------------------------------------------------------- | --------------------------------------- |
+| `INITIAL`     | Primera vez                                             | Búsqueda de los últimos 180 días        |
+| `RESCAN`      | Cambiaron las reglas del prefiltro                      | Igual, reevaluando lo descartado        |
+| `INCREMENTAL` | Resto de veces                                          | History API desde el último `historyId` |
+| `FALLBACK`    | Gmail ya no tiene ese historial (≈ 1 semana, error 404) | Búsqueda desde la última sync − 1 día   |
+
+- **Quién la lanza** (`sync_runs.trigger`): el botón (`USER`), el temporizador interno
+  (`SCHEDULER`, con `SCHEDULER_ENABLED=true`) o un cron externo (`CRON`) que llama a
+  `POST /api/v1/internal/sync`. En hosting gratuito la instancia se duerme y un temporizador
+  interno no corre, así que en producción se usa el cron:
+  [`.github/workflows/sync-cron.yml`](.github/workflows/sync-cron.yml) (secretos
+  `SYNC_URL` y `CRON_SECRET`) o cualquier servicio tipo cron-job.org.
+- **Tramos y reanudación**: cada llamada procesa un tramo acotado en tiempo; el checkpoint vive en
+  `sync_runs`, y un lock con caducidad evita que el botón y el cron procesen lo mismo a la vez.
+- **Mantenimiento** tras cada sync automática: las candidaturas en `APPLIED`/`SCREENING` sin
+  actividad en 30 días (`GHOSTED_AFTER_DAYS`) pasan a `GHOSTED` con un evento `SYSTEM` (cualquier
+  email posterior las reabre), y se borran las sesiones caducadas.
+
 ## Cómo está organizada la web
 
 - **`src/lib/api`**: interfaz `ApiClient` con dos implementaciones: HTTP (valida cada respuesta
@@ -142,7 +166,7 @@ Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
 2. ~~Backend (NestJS) + base de datos~~
 3. ~~Autenticación (Google OAuth, allowlist en backend)~~
 4. ~~Integración con Gmail~~
-5. **Clasificación de emails (reglas)** ← _actual_
-6. Sincronización automática
+5. ~~Clasificación de emails (reglas)~~
+6. **Sincronización automática** ← _actual_
 7. Extracción con IA
 8. Endurecimiento para producción

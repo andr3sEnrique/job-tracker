@@ -86,6 +86,13 @@ enum SyncRunType {
   RESCAN
 }
 
+/// Who started a sync: the user (button), the in-process scheduler or an external cron.
+enum SyncTrigger {
+  USER
+  SCHEDULER
+  CRON
+}
+
 enum SyncRunStatus {
   RUNNING
   SUCCESS
@@ -267,6 +274,7 @@ model SyncRun {
   id             String        @id @default(uuid(7)) @db.Uuid
   connectionId   String        @map("connection_id") @db.Uuid
   type           SyncRunType
+  trigger        SyncTrigger   @default(USER)
   status         SyncRunStatus @default(RUNNING)
   startedAt      DateTime      @default(now()) @map("started_at") @db.Timestamptz(3)
   finishedAt     DateTime?     @map("finished_at") @db.Timestamptz(3)

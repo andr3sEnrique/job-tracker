@@ -5,8 +5,11 @@ import { mapWithConcurrency } from './concurrency.js';
 import {
   GMAIL_READONLY_SCOPE,
   MailAuthError,
+  MailHistoryExpiredError,
+  MailNotFoundError,
   MailProvider,
   MailTransientError,
+  type HistoryPage,
   type MessageContent,
   type MessageMetadata,
 } from './mail-provider.js';
@@ -136,6 +139,42 @@ export class GmailApiProvider extends MailProvider {
     return { messages: res.messages ?? [], nextPageToken: res.nextPageToken };
   }
 
+  async listHistory(
+    refreshToken: string,
+    {
+      startHistoryId,
+      pageToken,
+      pageSize,
+    }: { startHistoryId: string; pageToken?: string; pageSize: number },
+  ): Promise<HistoryPage> {
+    const params = new URLSearchParams({
+      startHistoryId,
+      historyTypes: 'messageAdded',
+      maxResults: String(pageSize),
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    let res: {
+      history?: { messagesAdded?: { message: GmailMessage }[] }[];
+      nextPageToken?: string;
+      historyId: string;
+    };
+    try {
+      res = await this.call(this.client(refreshToken), `${API}/history?${params}`);
+    } catch (error) {
+      // Gmail answers 404 when the start id is older than the history it keeps.
+      if (error instanceof MailNotFoundError) throw new MailHistoryExpiredError('History expired');
+      throw error;
+    }
+    const messages = (res.history ?? []).flatMap((h) =>
+      (h.messagesAdded ?? []).map(({ message }) => ({
+        id: message.id,
+        threadId: message.threadId,
+        labels: message.labelIds ?? [],
+      })),
+    );
+    return { messages, nextPageToken: res.nextPageToken, historyId: res.historyId };
+  }
+
   async getMetadata(refreshToken: string, ids: readonly string[]): Promise<MessageMetadata[]> {
     const client = this.client(refreshToken);
     const params = new URLSearchParams({ format: 'metadata' });
@@ -143,8 +182,15 @@ export class GmailApiProvider extends MailProvider {
 
     // 5 in flight stays well below Gmail's per-user quota (messages.get = 5 units), even
     // during a full re-scan.
-    return mapWithConcurrency(ids, 5, async (id) => {
-      const msg = await this.call<GmailMessage>(client, `${API}/messages/${id}?${params}`);
+    const found = await mapWithConcurrency(ids, 5, async (id) => {
+      let msg: GmailMessage;
+      try {
+        msg = await this.call<GmailMessage>(client, `${API}/messages/${id}?${params}`);
+      } catch (error) {
+        // Deleted since it was listed (common for history entries): nothing to store.
+        if (error instanceof MailNotFoundError) return null;
+        throw error;
+      }
       const header = (name: string) =>
         msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
       return {
@@ -157,6 +203,7 @@ export class GmailApiProvider extends MailProvider {
         labels: msg.labelIds ?? [],
       };
     });
+    return found.filter((m): m is MessageMetadata => m !== null);
   }
 
   async getContent(refreshToken: string, id: string): Promise<MessageContent> {
@@ -190,6 +237,7 @@ export class GmailApiProvider extends MailProvider {
         }
         throw new MailTransientError(`Gmail API unavailable (${status})`);
       }
+      if (status === 404) throw new MailNotFoundError('Not found');
       throw error;
     }
   }

@@ -1,14 +1,17 @@
 import { ForbiddenException, type ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 import type { AppConfig } from '../config/app-config.service.js';
 import { CsrfGuard } from './csrf.guard.js';
 
 const config = { get: () => 'http://localhost:3000' } as unknown as AppConfig;
-const guard = new CsrfGuard(config);
+const guard = new CsrfGuard(config, new Reflector());
 
 const ctx = (method: string, headers: Record<string, string> = {}) =>
   ({
     switchToHttp: () => ({ getRequest: () => ({ method, headers }) }),
+    getHandler: () => () => undefined,
+    getClass: () => class {},
   }) as unknown as ExecutionContext;
 
 describe('CsrfGuard', () => {

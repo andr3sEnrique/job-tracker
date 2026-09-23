@@ -185,6 +185,7 @@ export const mockApiClient: ApiClient = {
       syncWindowDays: 180,
       counts: { candidates: mockEmails().length, pending: 0, needsReview: 3, skipped: 312 },
       lastRun: null,
+      lastAutomaticSyncAt: new Date(Date.now() - 20 * 60_000).toISOString(),
     }),
 
   runSync: () =>
@@ -193,7 +194,8 @@ export const mockApiClient: ApiClient = {
       processing: { processed: 0, needsReview: 0, failed: 0, remaining: 0 },
       run: {
         id: 'mock-run',
-        type: 'MANUAL' as const,
+        type: 'INCREMENTAL' as const,
+        trigger: 'USER' as const,
         status: 'SUCCESS' as const,
         startedAt: new Date().toISOString(),
         finishedAt: new Date().toISOString(),

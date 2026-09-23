@@ -37,6 +37,27 @@ export class MailTransientError extends Error {
   override readonly name = 'MailTransientError';
 }
 
+/** The message no longer exists (deleted after it was listed). */
+export class MailNotFoundError extends Error {
+  override readonly name = 'MailNotFoundError';
+}
+
+/**
+ * The history id is too old: Gmail keeps about a week of history. The caller falls back to a
+ * date-based search.
+ */
+export class MailHistoryExpiredError extends Error {
+  override readonly name = 'MailHistoryExpiredError';
+}
+
+/** One page of mailbox changes since a history id: only messages added to it. */
+export interface HistoryPage {
+  messages: (MessageRef & { labels: string[] })[];
+  nextPageToken?: string;
+  /** The mailbox's current history id: the starting point of the next incremental sync. */
+  historyId: string;
+}
+
 export const GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 /**
@@ -60,6 +81,12 @@ export abstract class MailProvider {
     refreshToken: string,
     params: { query: string; pageToken?: string; pageSize: number },
   ): Promise<{ messages: MessageRef[]; nextPageToken?: string }>;
+  /** Throws MailHistoryExpiredError when `startHistoryId` is no longer available. */
+  abstract listHistory(
+    refreshToken: string,
+    params: { startHistoryId: string; pageToken?: string; pageSize: number },
+  ): Promise<HistoryPage>;
+  /** Messages that no longer exist are left out of the result. */
   abstract getMetadata(refreshToken: string, ids: readonly string[]): Promise<MessageMetadata[]>;
   abstract getContent(refreshToken: string, id: string): Promise<MessageContent>;
 }

@@ -163,17 +163,20 @@ describe('Gmail integration', () => {
       const again = await syncUntilDone();
       expect(again).toHaveLength(1);
       expect(again[0].run).toMatchObject({
-        type: 'MANUAL',
+        type: 'INCREMENTAL',
         status: 'SUCCESS',
+        messagesListed: 0,
         candidates: 0,
         skipped: 0,
       });
       expect(await prisma.email.count()).toBe(TOTAL);
     });
 
-    it('resumes a multi-page catch-up sync instead of restarting it', async () => {
+    it('falls back to a resumable date search when Gmail history has expired', async () => {
       await syncUntilDone();
-      // Last sync long ago: the catch-up window covers the whole mailbox again.
+      // Last sync long ago and Gmail no longer has that history: the catch-up window covers
+      // the whole mailbox again.
+      mail.expireHistory();
       await prisma.gmailConnection.updateMany({
         data: { lastSyncedAt: new Date(Date.now() - 400 * 86_400_000) },
       });
@@ -181,16 +184,19 @@ describe('Gmail integration', () => {
       expect(again).toHaveLength(3);
       expect(new Set(again.map((r) => r.run.id)).size).toBe(1);
       expect(again.at(-1).run).toMatchObject({
-        type: 'MANUAL',
+        type: 'FALLBACK',
         status: 'SUCCESS',
         messagesListed: TOTAL,
         candidates: 0,
       });
+      // Back on track: the next sync is incremental again, from a fresh history id.
+      const [next] = await syncUntilDone();
+      expect(next.run).toMatchObject({ type: 'INCREMENTAL', messagesListed: 0 });
     });
 
-    it('picks up new messages on the next sync', async () => {
+    it('picks up new messages through the History API', async () => {
       await syncUntilDone();
-      mail.mailbox.unshift({
+      mail.deliver({
         id: 'fresh-1',
         threadId: 'fresh-thread',
         from: 'no-reply@ashbyhq.com',
@@ -203,7 +209,8 @@ describe('Gmail integration', () => {
         company: null,
         role: null,
       });
-      await syncUntilDone();
+      const [next] = await syncUntilDone();
+      expect(next.run).toMatchObject({ type: 'INCREMENTAL', messagesListed: 1, candidates: 1 });
       expect(await prisma.email.count()).toBe(TOTAL + 1);
       const fresh = await prisma.email.findFirstOrThrow({ where: { gmailMessageId: 'fresh-1' } });
       expect(fresh.prefilterReason).toBe('ats-sender:ashbyhq.com');
@@ -249,7 +256,7 @@ describe('Gmail integration', () => {
 
       // Rules are now current: the next sync is a normal catch-up again.
       const [next] = await syncUntilDone();
-      expect(next.run.type).toBe('MANUAL');
+      expect(next.run.type).toBe('INCREMENTAL');
     });
 
     it('refuses to run two syncs at once', async () => {

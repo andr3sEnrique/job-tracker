@@ -1,5 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
+import { SKIP_CSRF_KEY } from '../common/public.decorator.js';
 import { AppConfig } from '../config/app-config.service.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -15,13 +17,21 @@ export const CSRF_HEADER = 'x-requested-with';
 export class CsrfGuard implements CanActivate {
   private readonly allowedOrigin: string;
 
-  constructor(config: AppConfig) {
+  constructor(
+    config: AppConfig,
+    private readonly reflector: Reflector,
+  ) {
     this.allowedOrigin = new URL(config.get('FRONTEND_URL')).origin;
   }
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     if (SAFE_METHODS.has(request.method)) return true;
+    const skip = this.reflector.getAllAndOverride<boolean>(SKIP_CSRF_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (skip) return true;
 
     if (!request.headers[CSRF_HEADER]) throw new ForbiddenException('Missing CSRF header');
     const origin = request.headers.origin;

@@ -17,6 +17,7 @@ export function toSyncRun(run: SyncRunRow): SyncRun {
   return {
     id: run.id,
     type: run.type,
+    trigger: run.trigger,
     status: run.status,
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt?.toISOString() ?? null,
@@ -103,7 +104,7 @@ export class GmailConnectionsService {
     const connection = await this.prisma.gmailConnection.findFirst({ where: { userId } });
     if (!connection) return { connected: false };
 
-    const [groups, lastRun] = await Promise.all([
+    const [groups, lastRun, lastAutomatic] = await Promise.all([
       this.prisma.email.groupBy({
         by: ['processingStatus'],
         where: { connectionId: connection.id },
@@ -112,6 +113,11 @@ export class GmailConnectionsService {
       this.prisma.syncRun.findFirst({
         where: { connectionId: connection.id },
         orderBy: { startedAt: 'desc' },
+      }),
+      this.prisma.syncRun.findFirst({
+        where: { connectionId: connection.id, trigger: { in: ['SCHEDULER', 'CRON'] } },
+        orderBy: { startedAt: 'desc' },
+        select: { startedAt: true },
       }),
     ]);
     const count = (s: string) => groups.find((g) => g.processingStatus === s)?._count._all ?? 0;
@@ -133,6 +139,7 @@ export class GmailConnectionsService {
         skipped,
       },
       lastRun: lastRun ? toSyncRun(lastRun) : null,
+      lastAutomaticSyncAt: lastAutomatic?.startedAt.toISOString() ?? null,
     };
   }
 

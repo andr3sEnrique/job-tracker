@@ -8,6 +8,9 @@ export type GmailConnectionStatus = z.infer<typeof gmailConnectionStatusSchema>;
 export const SYNC_RUN_STATUSES = ['RUNNING', 'SUCCESS', 'PARTIAL', 'FAILED'] as const;
 export const syncRunStatusSchema = z.enum(SYNC_RUN_STATUSES);
 
+export const SYNC_TRIGGERS = ['USER', 'SCHEDULER', 'CRON'] as const;
+export const syncTriggerSchema = z.enum(SYNC_TRIGGERS);
+export type SyncTrigger = z.infer<typeof syncTriggerSchema>;
 export const SYNC_RUN_TYPES = ['INITIAL', 'INCREMENTAL', 'MANUAL', 'FALLBACK', 'RESCAN'] as const;
 export const syncRunTypeSchema = z.enum(SYNC_RUN_TYPES);
 
@@ -24,6 +27,7 @@ export type EmailProcessingStatus = z.infer<typeof emailProcessingStatusSchema>;
 export const syncRunSchema = z.object({
   id: z.string(),
   type: syncRunTypeSchema,
+  trigger: syncTriggerSchema,
   status: syncRunStatusSchema,
   startedAt: z.iso.datetime(),
   finishedAt: z.iso.datetime().nullable(),
@@ -52,6 +56,8 @@ export const gmailStatusSchema = z.discriminatedUnion('connected', [
       skipped: z.number().int(),
     }),
     lastRun: syncRunSchema.nullable(),
+    /** Last sync started by the scheduler or the external cron (not the button). */
+    lastAutomaticSyncAt: z.iso.datetime().nullable(),
   }),
 ]);
 export type GmailStatus = z.infer<typeof gmailStatusSchema>;

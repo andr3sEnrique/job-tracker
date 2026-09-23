@@ -110,11 +110,18 @@ export function GmailCard() {
                 )}
                 <span className="font-medium">{status.googleEmail}</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {status.lastSyncedAt
-                  ? `Última sincronización ${formatRelative(status.lastSyncedAt)}`
-                  : 'Aún no se ha sincronizado'}
-              </p>
+              <div className="text-right text-xs text-muted-foreground">
+                <p>
+                  {status.lastSyncedAt
+                    ? `Última sincronización ${formatRelative(status.lastSyncedAt)}`
+                    : 'Aún no se ha sincronizado'}
+                </p>
+                <p>
+                  {status.lastAutomaticSyncAt
+                    ? `Automática: ${formatRelative(status.lastAutomaticSyncAt)}`
+                    : 'Sin sincronizaciones automáticas aún'}
+                </p>
+              </div>
             </div>
 
             {status.status !== 'ACTIVE' && (

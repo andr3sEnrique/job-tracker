@@ -1,0 +1,41 @@
+# Wakes the deployed API up and runs the automatic Gmail sync.
+# Free hosts sleep when idle, so an in-process timer is not enough.
+# Needs two repository secrets:
+#   SYNC_URL     e.g. https://your-app.example/api/v1/internal/sync
+#   CRON_SECRET  the same value as the API's CRON_SECRET
+# Without them the job does nothing (so forks and a not-yet-deployed app stay green).
+name: Automatic sync
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sync-cron
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run sync until the backlog is done
+        env:
+          SYNC_URL: ${{ secrets.SYNC_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$SYNC_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "SYNC_URL / CRON_SECRET not configured: skipping."
+            exit 0
+          fi
+          # A sleeping instance can take a while to boot: generous timeout and retries.
+          for i in $(seq 1 10); do
+            body=$(curl --fail-with-body --silent --show-error --max-time 120 \
+              --retry 3 --retry-delay 20 --retry-all-errors \
+              -X POST -H "X-Cron-Secret: $CRON_SECRET" "$SYNC_URL")
+            echo "$body"
+            echo "$body" | grep -q '"hasMore":true' || break
+          done
