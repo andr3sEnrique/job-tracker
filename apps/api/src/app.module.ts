@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
+import { AccountModule } from './account/account.module.js';
 import { ApplicationsModule } from './applications/applications.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { PrismaExceptionFilter } from './common/prisma-exception.filter.js';
@@ -48,6 +49,7 @@ import { StatisticsModule } from './statistics/statistics.module.js';
     PrismaModule,
     CryptoModule,
     AuthModule,
+    AccountModule,
     ApplicationsModule,
     StatisticsModule,
     GmailModule,

@@ -13,8 +13,11 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
-    // Falls back to docker-compose's database so local dev needs no .env.
+    // The CLI (migrations) prefers a direct connection: Neon's pooled URL goes through
+    // PgBouncer, which does not support the session features migrations use. The app itself
+    // always uses DATABASE_URL. Falls back to docker-compose's database for local dev.
     url:
+      process.env.DIRECT_URL ??
       process.env.DATABASE_URL ??
       (process.env.NODE_ENV === 'production' ? undefined : LOCAL_DATABASE_URL),
   },

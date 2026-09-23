@@ -89,4 +89,33 @@ describe('httpApiClient', () => {
       sortBy: 'company',
     });
   });
+
+  describe('while the API wakes up', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('retries reads on gateway errors and announces it once', async () => {
+      const waking = vi.fn();
+      window.addEventListener('jat:server-waking', waking);
+      fetchMock
+        .mockResolvedValueOnce(json(502, {}))
+        .mockRejectedValueOnce(new TypeError('network'))
+        .mockResolvedValueOnce(
+          json(200, { id: 'u', email: 'me@example.com', name: null, avatarUrl: null }),
+        );
+
+      const assertion = expect(httpApiClient.getCurrentUser()).resolves.toMatchObject({ id: 'u' });
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(waking).toHaveBeenCalledTimes(1);
+      window.removeEventListener('jat:server-waking', waking);
+    });
+
+    it('never retries writes (the first attempt may have reached the server)', async () => {
+      fetchMock.mockResolvedValue(json(503, { message: 'Service Unavailable' }));
+      await expect(httpApiClient.deleteApplication('abc')).rejects.toMatchObject({ status: 503 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
 });

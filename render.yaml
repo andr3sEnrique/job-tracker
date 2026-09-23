@@ -1,0 +1,51 @@
+# Render Blueprint for the API (https://render.com/docs/blueprint-spec).
+# New → Blueprint → pick this repo. Values marked `sync: false` are asked for on the first
+# deploy and then live only in Render's dashboard. See docs/deploy.md.
+services:
+  - type: web
+    name: job-tracker-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    # Readiness checks the database too; a failing deploy never replaces a healthy one.
+    healthCheckPath: /api/v1/health/ready
+    # Deploy main only once CI is green.
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/shared/**
+        - pnpm-lock.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      # Neon: pooled URL for the app, direct URL for migrations (run at start-up).
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # The public web origin (Vercel), e.g. https://job-tracker.vercel.app
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ALLOWED_GOOGLE_EMAILS
+        sync: false
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      # Render generates 256 random bits, base64: exactly the expected format. Keep a copy
+      # somewhere safe: losing it means every Gmail connection must be re-authorised.
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: AI_PROVIDER
+        value: none
+      - key: ANTHROPIC_API_KEY
+        sync: false

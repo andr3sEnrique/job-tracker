@@ -1,5 +1,6 @@
 import { AlertCircle, BriefcaseBusiness } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { GoogleIcon } from '@/components/google-icon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +50,15 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             Solo se solicita tu nombre y email. El acceso a Gmail se concede aparte.
+          </p>
+          <p className="text-center text-xs text-muted-foreground">
+            <Link href="/welcome" className="underline-offset-4 hover:underline">
+              Qué es Job Tracker
+            </Link>
+            {' · '}
+            <Link href="/privacy" className="underline-offset-4 hover:underline">
+              Privacidad
+            </Link>
           </p>
         </CardContent>
       </Card>

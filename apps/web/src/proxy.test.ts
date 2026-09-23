@@ -24,8 +24,22 @@ describe('proxy', () => {
     expect(proxy(req('/login?error=forbidden')).headers.get('location')).toBeNull();
   });
 
-  it('does nothing in mock mode', () => {
+  it('keeps the pages Google requires public', () => {
+    expect(proxy(req('/privacy')).headers.get('location')).toBeNull();
+    expect(proxy(req('/welcome')).headers.get('location')).toBeNull();
+  });
+
+  it('does not redirect in mock mode', () => {
     vi.stubEnv('NEXT_PUBLIC_API_MODE', 'mock');
     expect(proxy(req('/applications')).headers.get('location')).toBeNull();
+  });
+
+  it('sets a strict CSP with a fresh nonce on every page', () => {
+    const first = proxy(req('/login')).headers.get('content-security-policy')!;
+    const second = proxy(req('/login')).headers.get('content-security-policy')!;
+    expect(first).toMatch(/script-src 'self' 'nonce-[\w+/=]+' 'strict-dynamic'/);
+    expect(first).toContain("frame-ancestors 'none'");
+    expect(first).toContain("object-src 'none'");
+    expect(first).not.toBe(second);
   });
 });

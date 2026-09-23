@@ -6,3 +6,9 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - esbuild
+
+# Security fixes for transitive dependencies of the Prisma CLI (pnpm audit). Remove once
+# Prisma ships them itself.
+overrides:
+  deepmerge-ts: ^8.0.2
+  mysql2: ^3.24.4

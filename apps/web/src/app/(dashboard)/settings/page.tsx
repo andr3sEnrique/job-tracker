@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { AiCard } from '@/components/settings/ai-card';
+import { DangerZoneCard } from '@/components/settings/danger-zone-card';
 import { GmailCard } from '@/components/settings/gmail-card';
 import { GmailConnectFeedback } from '@/components/settings/gmail-connect-feedback';
 
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       <div className="flex max-w-2xl flex-col gap-6">
         <GmailCard />
         <AiCard />
+        <DangerZoneCard />
       </div>
     </>
   );

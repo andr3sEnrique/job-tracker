@@ -28,6 +28,10 @@ export async function createTestApp() {
     .compile();
   const app = configureApp(moduleRef.createNestApplication({ logger: false }));
   await app.init();
+  // Listen on IPv4 loopback explicitly. Otherwise supertest starts the server on an ephemeral
+  // port of `::` but connects to 127.0.0.1, and on macOS another process can hold that same
+  // port on IPv4 and answer instead (random 404/200 responses under load).
+  await app.listen(0, '127.0.0.1');
   const prisma = app.get(PrismaService);
 
   // Guard against ever truncating a real database.

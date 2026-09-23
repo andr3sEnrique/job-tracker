@@ -28,12 +28,42 @@ export class ApiError extends Error {
   }
 }
 
+/** Fired while the API is waking up (free hosts sleep when idle); the UI shows a notice. */
+export const SERVER_WAKING_EVENT = 'jat:server-waking';
+/** Gateway errors while a sleeping instance boots (30–60 s on Render Free). */
+const WAKING_STATUSES = new Set([502, 503, 504]);
+const WAKE_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000, 30_000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Reads (GET) are retried while the API wakes up; writes are not, since the first attempt
+ * may have reached the server.
+ */
+async function fetchWithWakeRetry(url: string, init: RequestInit): Promise<Response> {
+  const idempotent = !init.method || init.method === 'GET';
+  for (let attempt = 0; ; attempt++) {
+    let response: Response | null = null;
+    try {
+      response = await fetch(url, init);
+    } catch (error) {
+      if (!idempotent || attempt >= WAKE_RETRY_DELAYS_MS.length) throw error;
+    }
+    if (response && (!idempotent || !WAKING_STATUSES.has(response.status))) return response;
+    if (attempt >= WAKE_RETRY_DELAYS_MS.length) return response as Response;
+    if (attempt === 0 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(SERVER_WAKING_EVENT));
+    }
+    await sleep(WAKE_RETRY_DELAYS_MS[attempt]!);
+  }
+}
+
 async function request<T extends z.ZodType>(
   path: string,
   schema: T | null,
   init: RequestInit = {},
 ): Promise<z.infer<T>> {
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await fetchWithWakeRetry(`${BASE}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',
@@ -116,6 +146,9 @@ export const httpApiClient: ApiClient = {
 
   getGmailStatus: () => request('/gmail/status', gmailStatusSchema),
   getAiStatus: () => request('/ai/status', aiStatusSchema),
+  async deleteAccount() {
+    await request('/account', null, { method: 'DELETE' });
+  },
 
   runSync: () => request('/sync/run', syncResultSchema, { method: 'POST' }),
 

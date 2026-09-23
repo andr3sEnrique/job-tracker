@@ -45,6 +45,8 @@ export const envSchema = z
     AUTH_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(10),
     /** Per-IP limit for everything else. */
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(300),
+    /** Per-IP limit for sync, cron and reprocess (each call can cost Gmail quota or AI tokens). */
+    SYNC_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
 
     /** AES-256-GCM key for Gmail refresh tokens. Generate with `openssl rand -base64 32`. */
     TOKEN_ENCRYPTION_KEY: base64Key.optional(),

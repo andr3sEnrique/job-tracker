@@ -4,11 +4,12 @@ Dashboard privado para gestionar candidaturas de empleo. El objetivo final es al
 automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
 cada candidatura.
 
-> **Estado: fase 7 (IA).** Los emails de Gmail se clasifican con reglas (EN/FR/ES) y, solo cuando
-> las reglas dudan, con un modelo de IA opcional (Claude Haiku 4.5 por defecto, u Ollama en local)
-> con presupuesto mensual. Crean o actualizan candidaturas y su historial; los casos dudosos van a
-> una bandeja de revisión. La sincronización es incremental (Gmail History API) y automática. El
-> contenido de los emails nunca se guarda. Ver el [plan técnico](docs/PLAN_TECNICO.md).
+> **Estado: fase 8 (lista para producción).** Los emails de Gmail se clasifican con reglas
+> (EN/FR/ES) y, solo cuando las reglas dudan, con IA opcional (Claude Haiku 4.5 u Ollama) con
+> presupuesto mensual. Crean o actualizan candidaturas y su historial; la sincronización es
+> incremental y automática. El contenido de los emails nunca se guarda. Se despliega gratis en
+> Vercel + Render + Neon ([guía](docs/deploy.md)). Ver el [plan técnico](docs/PLAN_TECNICO.md) y
+> las [decisiones de arquitectura](docs/adr/README.md).
 
 ## Stack
 
@@ -17,8 +18,10 @@ cada candidatura.
 | Monorepo | pnpm workspaces + Turborepo                                                                  |
 | Web      | Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, TanStack Query/Table, Recharts |
 | Shared   | Zod 4: enums y contratos compartidos por web y api                                           |
-| Api      | NestJS + Prisma + PostgreSQL _(fase 2)_                                                      |
-| Calidad  | TypeScript strict, ESLint, Prettier, Vitest, GitHub Actions                                  |
+| Api      | NestJS + Prisma + PostgreSQL                                                                 |
+| IA       | Puerto propio con adaptadores Anthropic (Claude Haiku 4.5) y Ollama, opcional                |
+| Calidad  | TypeScript strict, ESLint, Prettier, Vitest, Testcontainers, Playwright, GitHub Actions      |
+| Deploy   | Vercel (web) + Render Docker (api) + Neon (Postgres) + cron en GitHub Actions                |
 
 ## Estructura
 
@@ -30,8 +33,9 @@ packages/
   shared/               Enums y schemas Zod (contratos de la API)
   tsconfig/             tsconfig base compartidos
   eslint-config/        Config ESLint compartida
-docs/                   Plan técnico y decisiones
+docs/                   Plan técnico, despliegue y ADRs
 docker-compose.yml      PostgreSQL local (+ perfil `full` con la API en contenedor)
+render.yaml             Blueprint de Render para la API
 ```
 
 ## Requisitos
@@ -68,6 +72,7 @@ Para trabajar solo en la UI, sin API ni login: `pnpm dev:mock`.
 | `pnpm typecheck`        | `tsc --noEmit` (genera antes el cliente Prisma y los tipos de rutas)  |
 | `pnpm test`             | Tests unitarios y de componentes (Vitest)                             |
 | `pnpm test:integration` | Tests de la API contra PostgreSQL real (Testcontainers)               |
+| `pnpm test:e2e`         | Playwright (escritorio y móvil) contra un build de producción en mock |
 | `pnpm db:seed`          | Datos de ejemplo (`-- --force` los reemplaza, `-- --clear` los borra) |
 | `pnpm db:studio`        | Prisma Studio                                                         |
 | `pnpm format`           | Prettier                                                              |
@@ -90,6 +95,7 @@ Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de
 | GET    | `/gmail/callback`               | Guarda el refresh token cifrado                         |
 | GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync          |
 | DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados           |
+| DELETE | `/account`                      | Revoca Gmail y borra la cuenta y todos sus datos        |
 | POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)       |
 | POST   | `/internal/sync`                | Sync de todos los buzones + mantenimiento (cron)        |
 | GET    | `/ai/status`                    | Proveedor, modelo y gasto del mes frente al presupuesto |
@@ -98,8 +104,19 @@ Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de
 | POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual)  |
 | GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                         |
 
-**Seguridad:** todas las rutas exigen sesión salvo `health`, el login y `/internal/sync` (guard
-global que deniega por defecto). `/internal/sync` no usa cookies: exige la cabecera
+**Seguridad** (resumen; detalle en el [plan técnico §10](docs/PLAN_TECNICO.md#10-seguridad)):
+
+- **Web:** CSP con nonce por petición (`script-src 'nonce-…' 'strict-dynamic'`, sin
+  `unsafe-inline` para scripts), HSTS, `frame-ancestors 'none'`, `X-Frame-Options`, COOP y
+  `Permissions-Policy`. Los E2E fallan si la CSP bloquea algo.
+- **API:** helmet, Zod en cada entrada, rate limits (login 10/min, sync/cron/reprocess 30/min,
+  resto 300/min), logs sin cabeceras, query strings ni textos de emails.
+- **Dependencias:** Dependabot y `pnpm audit --prod` en CI (falla con vulnerabilidades altas).
+- **Datos:** borrado completo de la cuenta desde Ajustes; política de privacidad pública en
+  `/privacy`.
+
+Todas las rutas exigen sesión salvo `health`, el login y `/internal/sync` (guard global que
+deniega por defecto). `/internal/sync` no usa cookies: exige la cabecera
 `X-Cron-Secret` (comparada en tiempo constante) y no existe si `CRON_SECRET` no está definido. Las peticiones que modifican datos requieren además la cabecera
 `X-Requested-With` y un `Origin` válido (CSRF), y el login tiene rate limiting. Detalles en
 [docs/setup-google-cloud.md](docs/setup-google-cloud.md#cómo-se-protege-el-acceso).
@@ -199,5 +216,8 @@ EmailAnalyzer (híbrido) ─► reglas ─► ¿seguras? ── sí ──► re
 4. ~~Integración con Gmail~~
 5. ~~Clasificación de emails (reglas)~~
 6. ~~Sincronización automática~~
-7. **Clasificación y extracción con IA** ← _actual_
-8. Endurecimiento para producción
+7. ~~Clasificación y extracción con IA~~
+8. **Endurecimiento para producción** ← _actual_: CSP, borrado de cuenta, páginas públicas,
+   E2E, auditoría de dependencias, blueprint de despliegue y ADRs. Pendiente y opcional:
+   Sentry, métricas en Grafana, backups `pg_dump` cifrados y rotación de la clave de cifrado sin
+   reconectar Gmail.

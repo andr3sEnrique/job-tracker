@@ -38,6 +38,7 @@ export interface ApiClient {
   logout(): Promise<void>;
   getGmailStatus(): Promise<GmailStatus>;
   getAiStatus(): Promise<AiStatus>;
+  deleteAccount(): Promise<void>;
   runSync(): Promise<SyncResult>;
   disconnectGmail(): Promise<void>;
   listEmails(query: ListEmailsQuery): Promise<Paginated<EmailSummary>>;

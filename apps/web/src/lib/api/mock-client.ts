@@ -222,6 +222,8 @@ export const mockApiClient: ApiClient = {
 
   disconnectGmail: () => delay(undefined),
 
+  deleteAccount: () => delay(undefined),
+
   resolveEmail: () => delay(undefined),
 
   reprocessEmails: () => delay({ emailsReset: mockEmails().length, applicationsRemoved: 0 }),

@@ -35,7 +35,8 @@ La redirección apunta a la **web** (puerto 3000), no a la API: el callback pasa
 
 Para producción crea **otro cliente** con el dominio real (por ejemplo
 `https://job-tracker.vercel.app/api/v1/auth/google/callback`). Tener clientes separados evita
-que credenciales de desarrollo sirvan en producción.
+que credenciales de desarrollo sirvan en producción. Los pasos completos están en
+[deploy.md](deploy.md#4-google-cloud-producción).
 
 ## 4. Acceso a Gmail (fase 4)
 
@@ -43,7 +44,8 @@ que credenciales de desarrollo sirvan en producción.
 2. **Google Auth Platform → Data Access → Add or remove scopes** → añade
    `https://www.googleapis.com/auth/gmail.readonly` (solo lectura) → guarda.
 3. **Google Auth Platform → Audience → Publish app** → confirma. El estado pasa a
-   **In production**.
+   **In production**. Google pide antes una página principal y una política de privacidad
+   públicas: son `/welcome` y `/privacy` de la app desplegada (ver [deploy.md](deploy.md)).
 
 ¿Por qué publicar? `gmail.readonly` es un scope _restringido_. En modo **Testing**, Google caduca
 los refresh tokens a los 7 días y la sincronización dejaría de funcionar cada semana. Una app

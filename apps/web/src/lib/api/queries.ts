@@ -97,6 +97,18 @@ export function useLogout() {
   });
 }
 
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation({
+    mutationFn: () => api.deleteAccount(),
+    onSuccess: () => {
+      queryClient.clear();
+      router.replace('/welcome');
+    },
+  });
+}
+
 export function useApplications(query: ListApplicationsQuery) {
   return useQuery({
     queryKey: queryKeys.applicationList(query),

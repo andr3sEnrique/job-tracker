@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { headers } from 'next/headers';
 import { AppProviders } from '@/components/providers/app-providers';
+import { NONCE_HEADER } from '@/lib/csp';
 import './globals.css';
 
 const geistSans = Geist({ variable: '--font-sans', subsets: ['latin'] });
@@ -19,7 +21,9 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
+export default async function RootLayout({ children }: LayoutProps<'/'>) {
+  // Reading the request makes every page dynamic, which a per-request CSP nonce requires.
+  const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
   return (
     <html
       lang="es"
@@ -27,7 +31,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <AppProviders>{children}</AppProviders>
+        <AppProviders nonce={nonce}>{children}</AppProviders>
       </body>
     </html>
   );
