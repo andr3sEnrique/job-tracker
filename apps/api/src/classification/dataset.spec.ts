@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FAKE_COMPANIES,
   FAKE_ROLES,
+  REGRESSION_CASES,
   STANDALONE,
   STORIES,
   fill,
@@ -57,5 +58,32 @@ describe('extractor on the evaluation dataset', () => {
 
   it.each(cases.filter((c) => c.template.expected.role))('$name → role', ({ email, role }) => {
     expect(extractJobData(email).role?.toLowerCase()).toBe(role.toLowerCase());
+  });
+});
+
+describe('regression cases from real mailboxes (anonymised)', () => {
+  const prepared = REGRESSION_CASES.map((c) => ({
+    ...c,
+    email: prepareEmail({ subject: c.subject, from: c.from, text: c.body, html: null }),
+  }));
+
+  it.each(prepared)('$key → category', ({ email, expected }) => {
+    expect(classifier.classify(email).category).toBe(expected.category);
+  });
+
+  it.each(prepared.filter((c) => c.expected.company))('$key → company', ({ email, expected }) => {
+    expect(compact(extractJobData(email).company ?? '')).toBe(compact(expected.company!));
+  });
+
+  it.each(prepared.filter((c) => c.expected.role))('$key → role', ({ email, expected }) => {
+    expect(extractJobData(email).role).toBe(expected.role);
+  });
+
+  it.each(
+    prepared.filter(
+      (c) => !c.expected.company && !['IRRELEVANT', 'JOB_ALERT'].includes(c.expected.category),
+    ),
+  )('$key → no made-up company', ({ email }) => {
+    expect(extractJobData(email).company).toBeNull();
   });
 });

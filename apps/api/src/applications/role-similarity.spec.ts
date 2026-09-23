@@ -18,6 +18,12 @@ describe('roleSimilarity', () => {
 });
 
 describe('compactName', () => {
+  it('ignores leading articles and web suffixes', () => {
+    expect(compactName('Checkout.com')).toBe(compactName('Checkout'));
+    expect(compactName("Le Mercato de l'Emploi")).toBe(compactName('Mercato de lEmploi'));
+    expect(compactName('Team.is')).toBe(compactName('Teamis'));
+  });
+
   it('ignores spacing, case and accents', () => {
     expect(compactName('Nimbus Labs')).toBe(compactName('nimbuslabs'));
     expect(compactName('Énergie Brisa')).toBe('energiebrisa');

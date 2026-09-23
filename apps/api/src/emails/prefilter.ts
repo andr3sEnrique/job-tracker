@@ -8,7 +8,7 @@
  * Bump whenever the rules below change: connected mailboxes are then re-scanned over the
  * whole sync window (and previously discarded mail re-evaluated) on their next sync.
  */
-export const PREFILTER_VERSION = 4;
+export const PREFILTER_VERSION = 5;
 
 /** Applicant tracking systems and job platforms: mail from them is job-related by default. */
 export const JOB_SENDER_DOMAINS = [
@@ -70,6 +70,7 @@ export const JOB_SENDER_DOMAINS = [
   'pinpointhq.com',
   'recruitcrm.io',
   'homerun.co',
+  'recruitmail.com',
 ] as const;
 
 /** LinkedIn sends everything from linkedin.com; only these mailboxes are about jobs. */

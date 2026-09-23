@@ -8,7 +8,8 @@ import { EmailClassifier, type Classification, type PreparedEmail } from './type
  * a rejection that starts with "thank you for applying" is a rejection, and an interview
  * invitation that mentions "your application" is an interview.
  *
- * Patterns match the normalized text (lowercase, no accents) of subject + body.
+ * Patterns match the normalized text (lowercase, no accents) of subject + body, or the
+ * subject alone where the body is too noisy (see each rule).
  */
 
 interface Rule {
@@ -28,25 +29,33 @@ interface RuleContext {
 
 const anyOf = (patterns: RegExp[]) => (value: string) => patterns.some((p) => p.test(value));
 
+// --- Job alerts and suggested jobs --------------------------------------------------------
+
 const ALERT_SENDER =
-  /(^|[.@-])(job-?alerts?|alerts?)[.@-]|jobalert|jobs-listings@|jobalerts-noreply@/;
+  /(^|[.@-])(job-?alerts?|alerts?|alertes?)[.@-]|jobalert|jobs-listings@|jobalerts-noreply@/;
 const ALERT_SUBJECT = anyOf([
   /\bnew jobs?\b/,
   /\bjobs? (for you|you may|matching|recommended)/,
+  /\bjobs? (that )?match(es)? your\b/,
   /\bjob alert/,
   /nouvelles offres/,
   /offres? d'emploi (correspondant|pour vous|recommandees)/,
   /alerte emploi/,
+  /\brecrute (un|une|des)\b/,
+  /\bpeut vous interesser\b/,
   /nuevos empleos/,
   /empleos que coinciden/,
   /ofertas (para ti|recomendadas)/,
 ]);
 
-const REJECTION = anyOf([
+// --- Rejections -----------------------------------------------------------------------------
+
+const REJECTION_PATTERNS = [
   /\bunfortunately\b/,
   /\bnot (to )?(move|moving) forward\b/,
   /\bwill not be (moving forward|proceeding)\b/,
   /\bdecided to (pursue|proceed with|move forward with|go with) other/,
+  /\bmove forward with other candidates\b/,
   /\bposition has (been|now been) filled\b/,
   /\bno longer (considering|under consideration)\b/,
   /\bregret to inform\b/,
@@ -59,7 +68,55 @@ const REJECTION = anyOf([
   /\bcontinuar con otros? (candidatos|perfiles)\b/,
   /\bhemos decidido no (continuar|seguir|avanzar)\b/,
   /\bno (has|ha) sido seleccionad[oa]\b/,
+];
+
+/**
+ * "If you don't hear from us within 15 days, consider your application unsuccessful" is a
+ * confirmation, not a rejection: rejection phrases only count outside conditional sentences.
+ */
+const CONDITIONAL = /\b(si|sans|faute de|en l'absence|au cas|if|unless|should|in case|de no)\b/;
+
+function isRejection(text: string): boolean {
+  return text
+    .split(/[.!?\n]+/)
+    .some(
+      (sentence) => !CONDITIONAL.test(sentence) && REJECTION_PATTERNS.some((p) => p.test(sentence)),
+    );
+}
+
+/** Talent pool, archived application: the process is over, but softly worded. */
+const CLOSED = anyOf([
+  /\bvivier de talents?\b/,
+  /\btalent (pool|community)\b/,
+  /\bgarder (votre|vos) (cv|profil|coordonnees)\b/,
+  /\bchoisi (un autre|d'autres) (profil|candidat)/,
+  /\barchivage de votre candidature\b/,
+  /\bcandidature a ete archivee\b/,
+  /\bcontinuer a vous considerer\b/,
+  /\bn'est plus (disponible|d'actualite|a pourvoir)\b/,
+  /\b(job|position|offer) (is )?no longer available\b/,
+  /\boffre (a ete )?(pourvue|cloturee)\b/,
 ]);
+
+// --- Account and platform housekeeping (subject only) ---------------------------------------
+
+const ACCOUNT_SUBJECT = anyOf([
+  /\b(code de verification|verification code|verify your|votre code)\b/,
+  /\bconfirm(ez)? (your|votre) (email|adresse)\b|\bconfirmation de votre adresse\b/,
+  /\b(creation de compte|account (created|creation)|compte (est )?actif|votre compte)\b/,
+  /\blog ?in to\b|\bconnexion a votre compte\b|\bmot de passe\b|\bpassword\b/,
+  /\b(donnees personnelles|personal data|information has been deleted)\b|\bsuppression\b/,
+  /\bespace candidat\b|\bcandidate (account|portal)\b/,
+  /\byour experience at\b|\bsurvey\b|\bevaluer\b|\bquestionnaire\b/,
+  /\bwelcome to\b|\bbienvenue (sur|dans|chez)\b/,
+  /\bactivate your\b|\bactivez votre\b/,
+  /\bfinalisez votre candidature\b|\bcomplete your application\b/,
+  /\bnumero de telephone\b|\bphone number\b|\bverifiez vos informations\b|\bvisibilite\b/,
+  /\bsur votre telephone\b|\bapplication mobile\b/,
+  /\bprofile\b.*\barchiv/,
+]);
+
+// --- Offers and interviews ------------------------------------------------------------------
 
 const OFFER = anyOf([
   /\boffer letter\b/,
@@ -101,6 +158,23 @@ const INTERVIEW_STRONG = anyOf([
 
 const INTERVIEW_WEAK_SUBJECT = anyOf([/\binterview\b/, /\bentretien\b/, /\bentrevista\b/]);
 
+// --- Submissions and confirmations ----------------------------------------------------------
+
+/** Subject only: an unambiguous acknowledgement beats interview words in the body. */
+const CONFIRMATION_SUBJECT = anyOf([
+  /\breceived your application\b/,
+  /\bapplication (is in|received|has been received)\b/,
+  /\bthank(s| you) for (applying|your application)\b/,
+  /\bconfirmation (de )?(la )?(reception de )?(votre )?candidature\b/,
+  /\bcandidature (bien )?recue\b/,
+  /\bnous avons bien recu\b/,
+  /\bvotre candidature (est arrivee|a (bien )?ete (prise en compte|recue|enregistree|transmise))\b/,
+  /\bmerci (pour|de) votre candidature\b/,
+  /\bbienvenue (a bord )?(du|dans le) processus de recrutement\b/,
+  /\bhemos recibido tu\b/,
+  /\bgracias por tu (candidatura|solicitud)\b/,
+]);
+
 const SUBMITTED = anyOf([
   /\byour application was sent to\b/,
   /\bapplication submitted\b/,
@@ -109,6 +183,8 @@ const SUBMITTED = anyOf([
   /\bhas (aplicado|postulado) a\b/,
   /\bvotre candidature a (bien )?ete envoyee\b/,
   /\bcandidature envoyee\b/,
+  /\bcandidature sur offre\b/,
+  /\bcandidatures? via indeed\b/,
   /\bvous avez postule\b/,
 ]);
 
@@ -119,11 +195,18 @@ const CONFIRMATION = anyOf([
   /\bthank(s| you) for (applying|your application)\b/,
   /\bnous avons bien recu\b/,
   /\bbien recu votre candidature\b/,
+  /\baccusons (bonne )?reception\b/,
   /\bmerci pour votre candidature\b/,
   /\bmerci d'avoir postule\b/,
   /\bhemos recibido tu (candidatura|solicitud)\b/,
   /\bgracias por (tu|su) (candidatura|solicitud)\b/,
 ]);
+
+const INTEREST_SUBJECT = anyOf([/\bthank(s| you) for your interest\b/]);
+
+// --- People ------------------------------------------------------------------------------
+
+const PLATFORM_MESSAGE = anyOf([/\bnouveau message (envoye par|de)\b/, /\bnew message from\b/]);
 
 const RECRUITER_TOPIC = anyOf([
   /\byour (profile|application|background|experience)\b/,
@@ -165,7 +248,20 @@ const RULES: Rule[] = [
     confidence: 0.9,
     test: (c) => ALERT_SENDER.test(c.fromEmail) || ALERT_SUBJECT(c.subject),
   },
-  { id: 'rejection', category: 'REJECTION', confidence: 0.9, test: (c) => REJECTION(c.text) },
+  { id: 'rejection', category: 'REJECTION', confidence: 0.9, test: (c) => isRejection(c.text) },
+  { id: 'closed', category: 'REJECTION', confidence: 0.6, test: (c) => CLOSED(c.text) },
+  {
+    id: 'account',
+    category: 'IRRELEVANT',
+    confidence: 0.85,
+    test: (c) => ACCOUNT_SUBJECT(c.subject),
+  },
+  {
+    id: 'confirmation-subject',
+    category: 'APPLICATION_CONFIRMATION',
+    confidence: 0.85,
+    test: (c) => CONFIRMATION_SUBJECT(c.subject),
+  },
   { id: 'offer', category: 'OFFER', confidence: 0.85, test: (c) => OFFER(c.text) },
   {
     id: 'technical',
@@ -198,21 +294,28 @@ const RULES: Rule[] = [
     test: (c) => INTERVIEW_WEAK_SUBJECT(c.subject),
   },
   {
+    id: 'interest',
+    category: 'APPLICATION_CONFIRMATION',
+    confidence: 0.65,
+    test: (c) => INTEREST_SUBJECT(c.subject),
+  },
+  {
+    id: 'platform-message',
+    category: 'RECRUITER_REPLY',
+    confidence: 0.7,
+    test: (c) => PLATFORM_MESSAGE(c.subject),
+  },
+  {
     id: 'recruiter',
     category: 'RECRUITER_REPLY',
     confidence: 0.65,
     test: (c) => c.isPersonSender && RECRUITER_TOPIC(c.text),
   },
-  {
-    id: 'newsletter',
-    category: 'IRRELEVANT',
-    confidence: 0.7,
-    test: (c) => NEWSLETTER(c.text),
-  },
+  { id: 'newsletter', category: 'IRRELEVANT', confidence: 0.7, test: (c) => NEWSLETTER(c.text) },
 ];
 
 export class RulesClassifier extends EmailClassifier {
-  readonly id = 'rules@1';
+  readonly id = 'rules@2';
 
   classify(email: PreparedEmail): Classification {
     const fromEmail = email.fromEmail ?? '';

@@ -82,6 +82,11 @@ export function stripQuotedReply(text: string): string {
     .trim();
 }
 
+/** Zero-width characters some ATS put around names (U+200B "zero width space" and friends). */
+export function stripInvisible(value: string): string {
+  return value.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+}
+
 export function prepareEmail(input: {
   subject: string | null;
   from: string | null;
@@ -90,9 +95,12 @@ export function prepareEmail(input: {
 }): PreparedEmail {
   const from = parseFromHeader(input.from ?? undefined);
   const rawText = input.text?.trim() ? input.text : input.html ? htmlToText(input.html) : '';
-  const body = stripQuotedReply(rawText.replace(/\r\n/g, '\n')).slice(0, MAX_BODY_CHARS);
+  const body = stripQuotedReply(stripInvisible(rawText).replace(/\r\n/g, '\n')).slice(
+    0,
+    MAX_BODY_CHARS,
+  );
   return {
-    subject: (input.subject ?? '').trim(),
+    subject: stripInvisible(input.subject ?? '').trim(),
     fromName: from.name,
     fromEmail: from.email,
     fromDomain: from.domain,

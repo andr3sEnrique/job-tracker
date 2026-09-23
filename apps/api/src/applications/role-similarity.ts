@@ -53,11 +53,18 @@ export function roleSimilarity(a: string, b: string): number {
   return intersection / (ta.size + tb.size - intersection);
 }
 
-/** Company names compared without spaces or punctuation: "Nimbus Labs" ≈ "nimbuslabs". */
+/**
+ * Company names compared without spaces, punctuation, a leading article or a web suffix:
+ * "Nimbus Labs" ≈ "nimbuslabs", "Checkout.com" ≈ "Checkout", "Le Mercato de l'Emploi" ≈
+ * "Mercato de lEmploi".
+ */
 export function compactName(value: string): string {
   return value
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
+    .trim()
+    .replace(/^(the|le|la|les|l'|el|los)\s+/, '')
+    .replace(/\.(com|io|ai|fr|co|net|org|dev|app|es|eu)$/, '')
     .replace(/[^a-z0-9]/g, '');
 }
