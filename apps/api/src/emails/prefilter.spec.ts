@@ -52,6 +52,9 @@ describe('prefilter', () => {
     ['Interview availability', 'subject:interview'],
     ['Votre candidature chez Globex', 'subject:candidature'],
     ['Merci pour votre intérêt', 'subject:merci pour votre interet'],
+    ['Opportunity at Acme — quick chat?', 'subject:opportunity'],
+    ['Job opportunity: Senior Backend', 'subject:opportunity'],
+    ['You are a great candidate for this role', 'subject:candidate'],
     ['Votre profil a retenu notre attention', 'subject:votre profil'],
   ])('keeps job keywords in the subject: %s', (subject, reason) => {
     expect(prefilter(input({ subject }))).toEqual({ candidate: true, reason });

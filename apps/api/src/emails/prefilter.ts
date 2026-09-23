@@ -8,7 +8,7 @@
  * Bump whenever the rules below change: connected mailboxes are then re-scanned over the
  * whole sync window (and previously discarded mail re-evaluated) on their next sync.
  */
-export const PREFILTER_VERSION = 2;
+export const PREFILTER_VERSION = 3;
 
 /** Applicant tracking systems and job platforms: mail from them is job-related by default. */
 export const JOB_SENDER_DOMAINS = [
@@ -110,6 +110,9 @@ export const JOB_SUBJECT_KEYWORDS = [
   'coding challenge',
   'your profile',
   'thank you for your interest',
+  // Direct recruiter outreach ("Opportunity at Acme"). Noisier: Phase 5 classifies the rest out.
+  'opportunity',
+  'candidate',
   // fr
   'candidature',
   'entretien',
