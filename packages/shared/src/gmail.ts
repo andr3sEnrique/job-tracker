@@ -8,7 +8,7 @@ export type GmailConnectionStatus = z.infer<typeof gmailConnectionStatusSchema>;
 export const SYNC_RUN_STATUSES = ['RUNNING', 'SUCCESS', 'PARTIAL', 'FAILED'] as const;
 export const syncRunStatusSchema = z.enum(SYNC_RUN_STATUSES);
 
-export const SYNC_RUN_TYPES = ['INITIAL', 'INCREMENTAL', 'MANUAL', 'FALLBACK'] as const;
+export const SYNC_RUN_TYPES = ['INITIAL', 'INCREMENTAL', 'MANUAL', 'FALLBACK', 'RESCAN'] as const;
 export const syncRunTypeSchema = z.enum(SYNC_RUN_TYPES);
 
 export const EMAIL_PROCESSING_STATUSES = [

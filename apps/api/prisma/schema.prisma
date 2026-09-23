@@ -82,6 +82,8 @@ enum SyncRunType {
   INCREMENTAL
   MANUAL
   FALLBACK
+  /// Full-window re-scan after the prefilter rules changed.
+  RESCAN
 }
 
 enum SyncRunStatus {
@@ -241,6 +243,8 @@ model GmailConnection {
   lastHistoryId          String?               @map("last_history_id")
   lastSyncedAt           DateTime?             @map("last_synced_at") @db.Timestamptz(3)
   initialSyncCompletedAt DateTime?             @map("initial_sync_completed_at") @db.Timestamptz(3)
+  /// Prefilter rules the stored mail was evaluated with; older → re-scan on next sync.
+  prefilterVersion       Int                   @default(0) @map("prefilter_version")
   /// Lease that prevents two syncs (cron + manual) from running at the same time.
   syncLockedUntil        DateTime?             @map("sync_locked_until") @db.Timestamptz(3)
   createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)

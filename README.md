@@ -84,6 +84,12 @@ Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de
 | POST   | `/applications/:id/notes`       | Añade una nota al historial                       |
 | DELETE | `/applications/:id`             | Borra la candidatura y su historial               |
 | GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                 |
+| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)    |
+| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                   |
+| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync    |
+| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados     |
+| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`) |
+| GET    | `/emails`                       | Metadatos de los emails relevantes                |
 | GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                   |
 
 **Seguridad:** todas las rutas exigen sesión salvo `health` y el login (guard global que deniega

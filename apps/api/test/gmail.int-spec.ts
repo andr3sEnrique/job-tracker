@@ -182,6 +182,45 @@ describe('Gmail integration', () => {
       expect(fresh.prefilterReason).toBe('ats-sender:ashbyhq.com');
     });
 
+    it('re-scans the whole window when the prefilter rules change, re-evaluating discarded mail', async () => {
+      await syncUntilDone();
+      // Simulate mail evaluated by older rules: some candidates had been discarded.
+      const victims = await prisma.email.findMany({
+        where: { processingStatus: 'PENDING' },
+        take: 5,
+      });
+      await prisma.email.updateMany({
+        where: { id: { in: victims.map((v) => v.id) } },
+        data: {
+          processingStatus: 'SKIPPED',
+          subject: null,
+          fromEmail: null,
+          fromName: null,
+          fromDomain: null,
+        },
+      });
+      await prisma.gmailConnection.updateMany({ data: { prefilterVersion: 1 } });
+
+      const results = await syncUntilDone();
+      expect(results.at(-1).run).toMatchObject({
+        type: 'RESCAN',
+        status: 'SUCCESS',
+        messagesListed: TOTAL,
+        candidates: 5,
+      });
+
+      expect(await prisma.email.count()).toBe(TOTAL);
+      expect(await prisma.email.count({ where: { processingStatus: 'PENDING' } })).toBe(CANDIDATES);
+      const restored = await prisma.email.findFirstOrThrow({
+        where: { gmailMessageId: victims[0]!.gmailMessageId },
+      });
+      expect(restored.subject).not.toBeNull();
+
+      // Rules are now current: the next sync is a normal catch-up again.
+      const [next] = await syncUntilDone();
+      expect(next.run.type).toBe('MANUAL');
+    });
+
     it('refuses to run two syncs at once', async () => {
       await prisma.gmailConnection.updateMany({
         data: { syncLockedUntil: new Date(Date.now() + 60_000) },

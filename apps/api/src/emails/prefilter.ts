@@ -4,6 +4,12 @@
  * Irrelevant mail is discarded here, so later stages (and any AI) never see it.
  */
 
+/**
+ * Bump whenever the rules below change: connected mailboxes are then re-scanned over the
+ * whole sync window (and previously discarded mail re-evaluated) on their next sync.
+ */
+export const PREFILTER_VERSION = 2;
+
 /** Applicant tracking systems and job platforms: mail from them is job-related by default. */
 export const JOB_SENDER_DOMAINS = [
   'greenhouse.io',
@@ -41,6 +47,29 @@ export const JOB_SENDER_DOMAINS = [
   'otta.com',
   'hired.com',
   'turing.com',
+  // France
+  'hellowork.com',
+  'welcomekit.co',
+  'apec.fr',
+  'talent-soft.com',
+  'beetween.com',
+  'beetween-software.com',
+  'jobteaser.com',
+  'francetravail.fr',
+  'pole-emploi.fr',
+  'cadremploi.fr',
+  'meteojob.com',
+  'monster.fr',
+  'flatchr.io',
+  'taleez.com',
+  'digitalrecruiters.com',
+  'jobaffinity.fr',
+  // Other ATS
+  'softgarden.io',
+  'zohorecruit.com',
+  'pinpointhq.com',
+  'recruitcrm.io',
+  'homerun.co',
 ] as const;
 
 /** LinkedIn sends everything from linkedin.com; only these mailboxes are about jobs. */
@@ -63,6 +92,7 @@ export const JOB_SUBJECT_KEYWORDS = [
   'tu perfil',
   'vacante',
   'puesto de',
+  'postulacion',
   // en
   'application',
   'applying',
@@ -78,12 +108,19 @@ export const JOB_SUBJECT_KEYWORDS = [
   'next steps',
   'assessment',
   'coding challenge',
+  'your profile',
+  'thank you for your interest',
   // fr
   'candidature',
   'entretien',
   "offre d'emploi",
   'recrutement',
   'poste de',
+  'postulation',
+  'votre profil',
+  'merci pour votre interet',
+  'suite a votre',
+  'processus de recrutement',
 ] as const;
 
 /** Never job mail, whatever the headers say. */

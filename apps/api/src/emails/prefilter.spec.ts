@@ -19,6 +19,8 @@ describe('prefilter', () => {
       'ats-sender:myworkdayjobs.com',
     ],
     ['noreply@infojobs.net', 'infojobs.net', 'ats-sender:infojobs.net'],
+    ['noreply@emails.hellowork.com', 'emails.hellowork.com', 'ats-sender:hellowork.com'],
+    ['no-reply@candidates.welcomekit.co', 'candidates.welcomekit.co', 'ats-sender:welcomekit.co'],
   ])('keeps mail from job platforms (%s)', (fromEmail, fromDomain, reason) => {
     expect(prefilter(input({ fromEmail, fromDomain, subject: 'Update' }))).toEqual({
       candidate: true,
@@ -49,6 +51,8 @@ describe('prefilter', () => {
     ['Your application to Acme', 'subject:application'],
     ['Interview availability', 'subject:interview'],
     ['Votre candidature chez Globex', 'subject:candidature'],
+    ['Merci pour votre intérêt', 'subject:merci pour votre interet'],
+    ['Votre profil a retenu notre attention', 'subject:votre profil'],
   ])('keeps job keywords in the subject: %s', (subject, reason) => {
     expect(prefilter(input({ subject }))).toEqual({ candidate: true, reason });
   });

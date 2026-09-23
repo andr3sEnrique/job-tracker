@@ -15,11 +15,22 @@ export interface IngestResult {
 export class EmailsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Of these Gmail ids, which are new for this connection (never stored before)? */
-  async filterNew(connectionId: string, gmailMessageIds: readonly string[]): Promise<string[]> {
+  /**
+   * Of these Gmail ids, which need processing? New ones, plus — when re-scanning after a
+   * rules change — the ones previously discarded.
+   */
+  async filterNew(
+    connectionId: string,
+    gmailMessageIds: readonly string[],
+    { includeSkipped = false } = {},
+  ): Promise<string[]> {
     if (gmailMessageIds.length === 0) return [];
     const known = await this.prisma.email.findMany({
-      where: { connectionId, gmailMessageId: { in: [...gmailMessageIds] } },
+      where: {
+        connectionId,
+        gmailMessageId: { in: [...gmailMessageIds] },
+        ...(includeSkipped && { processingStatus: { not: 'SKIPPED' } }),
+      },
       select: { gmailMessageId: true },
     });
     const seen = new Set(known.map((e) => e.gmailMessageId));
@@ -34,8 +45,20 @@ export class EmailsService {
   async ingest(
     connection: { id: string; googleEmail: string },
     messages: readonly MessageMetadata[],
+    { replaceSkipped = false } = {},
   ): Promise<IngestResult> {
     if (messages.length === 0) return { candidates: 0, skipped: 0 };
+
+    if (replaceSkipped) {
+      // Re-evaluated with new rules: drop the old verdict so the row is written fresh.
+      await this.prisma.email.deleteMany({
+        where: {
+          connectionId: connection.id,
+          processingStatus: 'SKIPPED',
+          gmailMessageId: { in: messages.map((m) => m.id) },
+        },
+      });
+    }
 
     const threadIds = [...new Set(messages.map((m) => m.threadId))];
     await this.prisma.emailThread.createMany({
