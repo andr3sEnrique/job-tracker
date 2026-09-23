@@ -64,7 +64,8 @@ export function compactName(value: string): string {
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .trim()
-    .replace(/^(the|le|la|les|l'|el|los)\s+/, '')
+    .replace(/^(the|le|la|les|l'|el|los|groupe|group)\s+/, '')
+    .replace(/\s+(team|groupe|group)$/, '')
     .replace(/\.(com|io|ai|fr|co|net|org|dev|app|es|eu)$/, '')
     .replace(/[^a-z0-9]/g, '');
 }

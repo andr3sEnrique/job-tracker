@@ -13,8 +13,8 @@ import type { ExtractedData, PreparedEmail } from './types.js';
 const NAME = String.raw`([\p{L}\p{N}][\p{L}\p{N}&'’.\- ]{0,60}?)`;
 const CONNECTORS = String.raw`for|as|pour|para|en|at|chez|in|and|et|y|·|a (?:bien )?(?:ete|été)|has|have|is|est|was`;
 const END = String.raw`(?=\s*(?:\.(?:\s|$)|[,!?:;|()\n]|\s[—–-]\s|\s(?:${CONNECTORS})\s|$))`;
-// A role inside running text: like NAME but also allows "/", "()", "+", "#".
-const ROLE = String.raw`([\p{L}\p{N}][\p{L}\p{N}&'’.\-/()+# ]{1,80}?)`;
+// A role inside running text: like NAME but also allows "/", "()", "+", "#", "," and "€".
+const ROLE = String.raw`([\p{L}\p{N}][\p{L}\p{N}&'’.\-/()+#,€$% ]{1,100}?)`;
 
 // ------------------------------------------------------------------------------------------
 // Company
@@ -104,7 +104,7 @@ const NOT_A_COMPANY = new Set([
 
 /** Leading words that belong to the sentence, not to the company name. */
 const COMPANY_LEAD =
-  /^(?:join|joining|the|recrutement[- ]?|l'[ée]quipe(?: de)?|equipe(?: de)?|team)\s+/iu;
+  /^(?:join|joining|the|recrutement[- ]?|l'[ée]quipe(?: de)?|equipe(?: de)?|team|groupe|group)\s+/iu;
 const FIRST_WORD_STOP =
   /^(?:nous|notre|vous|votre|our|your|we|us|how|understand|de|du|des|la|le|les|a|an|this|that)\b/iu;
 
@@ -142,6 +142,7 @@ function cleanCompany(value: string | undefined): string | null {
     .trim();
   if (!v) return null;
   for (let i = 0; i < 2; i++) v = v.replace(COMPANY_LEAD, '');
+  v = v.replace(/\s+(?:team|group|groupe)$/iu, ''); // "the Acme team" → Acme
   if (v.length < 2 || v.length > 60 || v.split(' ').length > 5) return null;
   if (FIRST_WORD_STOP.test(v) || NOT_A_COMPANY.has(v.toLowerCase())) return null;
   return v;
@@ -172,8 +173,15 @@ const ROLE_SUBJECT_PATTERNS: RegExp[] = [
 ];
 
 const ROLE_BODY_PATTERNS: RegExp[] = [
-  new RegExp(String.raw`for the ${ROLE} (?:position|role)\b`, 'iu'),
-  new RegExp(String.raw`applying (?:to|for) the ${ROLE} (?:position|role)\b`, 'iu'),
+  // "…your application for the Software Engineer, New Grad position at Acme"
+  new RegExp(String.raw`\bfor the ${ROLE} (?:position|role|job|opening)\b`, 'iu'),
+  // "…taking the time to apply to the Core Engineer - Infrastructure role"
+  new RegExp(
+    String.raw`\bappl(?:y|ied|ying) (?:to|for) the ${ROLE} (?:position|role|job|opening)\b`,
+    'iu',
+  ),
+  // "…your interest in Acme and the Manager I, Engineering role"
+  new RegExp(String.raw`\band the ${ROLE} (?:position|role|job|opening)\b`, 'iu'),
   new RegExp(String.raw`\bour ${ROLE} (?:opening|role|position)\b`, 'iu'),
   new RegExp(String.raw`\bjoin .{1,60}? as ${ROLE}${END}`, 'iu'),
   new RegExp(String.raw`\b(?:pour le|au) poste de ${ROLE}${END}`, 'iu'),
@@ -185,11 +193,21 @@ const GENDER_MARKER =
   /\(?\s*\b(?:[HFM]\s*\/\s*[HFMX](?:\s*\/\s*[HFMX])?|m\s*\/\s*w\s*\/\s*d)\b\s*\)?/giu;
 const ROLE_STOPWORDS = /\b(?:this|that|our|your|we|needs|you|nous|vous|notre|votre)\b/iu;
 
-function cleanRole(value: string | undefined): string | null {
+/** " - 50-70K€ + BSPCE", " - 45 000 €": salary segments are not part of the role. */
+// A last " - " segment (hyphens inside it, like "50-70K€", are fine) with a digit and a
+// currency or "k" marker.
+const SALARY_SEGMENT =
+  /\s+[-–—|]\s+(?=(?:(?!\s[-–—|]\s).)*\d)(?=(?:(?!\s[-–—|]\s).)*(?:k€|€|\$|\beur\b|\busd\b|bspce|\d\s?k\b))(?:(?!\s[-–—|]\s).)+$/iu;
+
+/**
+ * Subject roles are followed by noise ("Role - Team - Paris"), so only the first segment is
+ * kept. Body roles sit between explicit markers ("the X role"), so their segments are kept.
+ */
+function cleanRole(value: string | undefined, { firstSegment = true } = {}): string | null {
   if (!value) return null;
   let v = value.replace(GENDER_MARKER, ' ').replace(/\s+/g, ' ').trim();
-  // "Role - Team - Paris": the first segment is the role.
-  v = v.split(/\s+[-–—|]\s+|\s+\/\s+/)[0] ?? '';
+  while (SALARY_SEGMENT.test(v)) v = v.replace(SALARY_SEGMENT, '');
+  if (firstSegment) v = v.split(/\s+[-–—|]\s+|\s+\/\s+/)[0] ?? '';
   v = v
     .replace(/\s+\d{5,}$/, '') // requisition numbers
     .replace(/^[\s"'“«]+|[\s"'”».,:;!?-]+$/g, '')
@@ -316,7 +334,7 @@ export function extractJobData(email: PreparedEmail): ExtractedData {
 
   let role =
     firstMatch(ROLE_SUBJECT_PATTERNS, email.subject, cleanRole) ??
-    firstMatch(ROLE_BODY_PATTERNS, email.body, cleanRole);
+    firstMatch(ROLE_BODY_PATTERNS, email.body, (v) => cleanRole(v, { firstSegment: false }));
 
   // LinkedIn-style block: "{role}\n{company} · {location} ({mode})".
   let location: string | null = null;

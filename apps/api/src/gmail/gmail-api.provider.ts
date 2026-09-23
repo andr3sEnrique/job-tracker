@@ -13,7 +13,7 @@ import {
 
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const METADATA_HEADERS = ['From', 'Subject', 'Message-ID'];
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 4;
 
 interface GmailPart {
   mimeType?: string;
@@ -141,8 +141,9 @@ export class GmailApiProvider extends MailProvider {
     const params = new URLSearchParams({ format: 'metadata' });
     for (const h of METADATA_HEADERS) params.append('metadataHeaders', h);
 
-    // 10 in flight stays far below Gmail's per-user quota (messages.get = 5 units).
-    return mapWithConcurrency(ids, 10, async (id) => {
+    // 5 in flight stays well below Gmail's per-user quota (messages.get = 5 units), even
+    // during a full re-scan.
+    return mapWithConcurrency(ids, 5, async (id) => {
       const msg = await this.call<GmailMessage>(client, `${API}/messages/${id}?${params}`);
       const header = (name: string) =>
         msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value;
@@ -183,7 +184,8 @@ export class GmailApiProvider extends MailProvider {
       }
       if (status === 429 || status === 403 || (status !== undefined && status >= 500)) {
         if (attempt < MAX_RETRIES) {
-          await sleep(2 ** attempt * 500 + Math.random() * 250);
+          // 1s, 2s, 4s, 8s (+ jitter): long enough to get back under Gmail's per-user quota.
+          await sleep(2 ** attempt * 1000 + Math.random() * 500);
           return this.call<T>(client, url, attempt + 1);
         }
         throw new MailTransientError(`Gmail API unavailable (${status})`);

@@ -207,6 +207,10 @@ export class EmailEventsService {
         .map((c) => ({ id: c.id, score: roleSimilarity(c.roleTitle, extracted.role!) }))
         .sort((a, b) => b.score - a.score);
       if (scored[0]!.score >= ROLE_MATCH_THRESHOLD) return scored[0]!.id;
+      // An earlier email for this company had no role (e.g. "your application reached Acme"):
+      // this one completes that application rather than starting another.
+      const roleless = candidates.find((c) => c.roleTitle === UNKNOWN_ROLE);
+      if (roleless) return roleless.id;
       // A new confirmation for another role at the same company is a new application.
       if (category === 'APPLICATION_SUBMITTED' || category === 'APPLICATION_CONFIRMATION')
         return null;

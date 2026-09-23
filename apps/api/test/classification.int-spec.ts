@@ -148,6 +148,38 @@ describe('Email classification pipeline', () => {
     expect(await counts()).toEqual(before);
   });
 
+  it('completes a role-less application instead of duplicating it', async () => {
+    const base = { labels: ['INBOX'], template: null, company: null, role: null };
+    mail.mailbox = [
+      {
+        ...base,
+        id: 'later-with-role',
+        threadId: 't-2',
+        from: '"Nordvik" <no-reply@nordvik.teamtailor-mail.com>',
+        subject: 'Nous avons bien reçu votre candidature !',
+        body: 'Bonjour, merci pour votre candidature au poste de Data Engineer.',
+        rfc822MessageId: '<t2@mail.fake>',
+        receivedAt: new Date(Date.now() - 86_400_000),
+      },
+      {
+        ...base,
+        id: 'first-without-role',
+        threadId: 't-1',
+        from: 'noreply@emails.hellowork.com',
+        subject: 'Votre candidature est arrivée chez Nordvik',
+        body: 'Ces offres publiées dernièrement pourraient vous intéresser.',
+        rfc822MessageId: '<t1@mail.fake>',
+        receivedAt: new Date(Date.now() - 2 * 86_400_000),
+      },
+    ];
+    await connectAndSync();
+
+    const apps = await prisma.application.findMany({ include: { events: true } });
+    expect(apps).toHaveLength(1);
+    expect(apps[0]).toMatchObject({ roleTitle: 'Data Engineer' });
+    expect(apps[0]!.events).toHaveLength(2);
+  });
+
   it('never overwrites fields edited by hand', async () => {
     const first = generateFakeMailbox(120);
     // Only the LinkedIn submission first: the application gets a location from the email.

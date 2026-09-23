@@ -68,6 +68,7 @@ const REJECTION_PATTERNS = [
   /\bcontinuar con otros? (candidatos|perfiles)\b/,
   /\bhemos decidido no (continuar|seguir|avanzar)\b/,
   /\bno (has|ha) sido seleccionad[oa]\b/,
+  /\bchoisi (un autre|d'autres) (profil|candidat)/,
 ];
 
 /**
@@ -89,7 +90,6 @@ const CLOSED = anyOf([
   /\bvivier de talents?\b/,
   /\btalent (pool|community)\b/,
   /\bgarder (votre|vos) (cv|profil|coordonnees)\b/,
-  /\bchoisi (un autre|d'autres) (profil|candidat)/,
   /\barchivage de votre candidature\b/,
   /\bcandidature a ete archivee\b/,
   /\bcontinuer a vous considerer\b/,
@@ -249,19 +249,20 @@ const RULES: Rule[] = [
     test: (c) => ALERT_SENDER.test(c.fromEmail) || ALERT_SUBJECT(c.subject),
   },
   { id: 'rejection', category: 'REJECTION', confidence: 0.9, test: (c) => isRejection(c.text) },
-  { id: 'closed', category: 'REJECTION', confidence: 0.6, test: (c) => CLOSED(c.text) },
   {
     id: 'account',
     category: 'IRRELEVANT',
     confidence: 0.85,
     test: (c) => ACCOUNT_SUBJECT(c.subject),
   },
+  // Before "closed": confirmations often mention the talent pool ("we'll keep your CV").
   {
     id: 'confirmation-subject',
     category: 'APPLICATION_CONFIRMATION',
     confidence: 0.85,
     test: (c) => CONFIRMATION_SUBJECT(c.subject),
   },
+  { id: 'closed', category: 'REJECTION', confidence: 0.6, test: (c) => CLOSED(c.text) },
   { id: 'offer', category: 'OFFER', confidence: 0.85, test: (c) => OFFER(c.text) },
   {
     id: 'technical',

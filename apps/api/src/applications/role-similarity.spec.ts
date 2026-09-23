@@ -22,6 +22,8 @@ describe('compactName', () => {
     expect(compactName('Checkout.com')).toBe(compactName('Checkout'));
     expect(compactName("Le Mercato de l'Emploi")).toBe(compactName('Mercato de lEmploi'));
     expect(compactName('Team.is')).toBe(compactName('Teamis'));
+    expect(compactName('LR Technologies Groupe')).toBe(compactName('LR Technologies'));
+    expect(compactName('Groupe AFNOR')).toBe(compactName('AFNOR'));
   });
 
   it('ignores spacing, case and accents', () => {
