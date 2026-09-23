@@ -30,3 +30,6 @@ test-results/
 
 # local tooling
 .claude/
+
+# prisma client (generated)
+apps/api/src/generated/

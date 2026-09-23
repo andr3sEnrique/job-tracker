@@ -16,6 +16,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { API_MODE } from '@/lib/api';
 import { NAV_ITEMS, isNavItemActive } from './nav-items';
 
 export function AppSidebar() {
@@ -67,7 +68,7 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-          Datos de ejemplo · Fase 1
+          {API_MODE === 'mock' ? 'Datos de ejemplo (mock)' : 'Fase 2 · API local'}
         </p>
       </SidebarFooter>
       <SidebarRail />

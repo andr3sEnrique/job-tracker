@@ -1,36 +1,29 @@
 import type {
+  AddNoteInput,
   Application,
   ApplicationDetail,
   ApplicationEvent,
-  Funnel,
+  ChangeStatusInput,
+  CreateApplicationInput,
+  DashboardStats,
   ListApplicationsQuery,
   Paginated,
-  SourceCount,
-  StatsSummary,
-  StatusCount,
-  TimelinePoint,
+  UpdateApplicationInput,
 } from '@jat/shared';
 
-export interface RecentActivityItem {
-  event: ApplicationEvent;
-  application: Pick<Application, 'id' | 'roleTitle' | 'company'>;
-}
-
-export interface DashboardStats {
-  summary: StatsSummary;
-  timeline: TimelinePoint[];
-  statusDistribution: StatusCount[];
-  sourceDistribution: SourceCount[];
-  funnel: Funnel;
-  recentActivity: RecentActivityItem[];
-}
+export type { DashboardStats, RecentActivityItem } from '@jat/shared';
 
 /**
- * Everything the UI needs from the backend. Phase 1 ships a mock implementation;
- * Phase 2 adds an HTTP implementation against the NestJS API with the same shape.
+ * Everything the UI needs from the backend. Two implementations share this shape:
+ * the HTTP client (NestJS API) and an in-memory mock for demos and offline work.
  */
 export interface ApiClient {
   listApplications(query: ListApplicationsQuery): Promise<Paginated<Application>>;
   getApplication(id: string): Promise<ApplicationDetail | null>;
   getDashboardStats(): Promise<DashboardStats>;
+  createApplication(input: CreateApplicationInput): Promise<ApplicationDetail>;
+  updateApplication(id: string, input: UpdateApplicationInput): Promise<ApplicationDetail>;
+  changeStatus(id: string, input: ChangeStatusInput): Promise<ApplicationDetail>;
+  addNote(id: string, input: AddNoteInput): Promise<ApplicationEvent>;
+  deleteApplication(id: string): Promise<void>;
 }

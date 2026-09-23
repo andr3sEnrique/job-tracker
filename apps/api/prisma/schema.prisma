@@ -1,0 +1,165 @@
+// Data model — see docs/PLAN_TECNICO.md §4.
+// Gmail-related tables (gmail_connections, emails, email_threads, sync_runs) arrive in Phase 4.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  runtime             = "nodejs"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SCREENING
+  INTERVIEWING
+  OFFER
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  GHOSTED
+}
+
+enum ApplicationSource {
+  LINKEDIN
+  INDEED
+  INFOJOBS
+  COMPANY_SITE
+  REFERRAL
+  RECRUITER
+  OTHER
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+  UNKNOWN
+}
+
+enum SalaryPeriod {
+  YEAR
+  MONTH
+  HOUR
+}
+
+enum ApplicationOrigin {
+  EMAIL
+  MANUAL
+}
+
+enum EventType {
+  APPLIED
+  CONFIRMATION_RECEIVED
+  RECRUITER_CONTACT
+  INTERVIEW_SCHEDULED
+  TECHNICAL_INTERVIEW_SCHEDULED
+  OFFER_RECEIVED
+  REJECTED
+  WITHDRAWN
+  STATUS_CHANGED
+  NOTE
+}
+
+enum EventSource {
+  EMAIL
+  MANUAL
+  SYSTEM
+}
+
+model User {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  /// Stable Google account id. Null until the user logs in with Google (Phase 3).
+  googleSub   String?   @unique @map("google_sub")
+  email       String    @unique
+  name        String?
+  avatarUrl   String?   @map("avatar_url")
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  companies    Company[]
+  applications Application[]
+
+  @@map("users")
+}
+
+model Company {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  name           String
+  /// Lowercase, accent-free, without legal suffixes ("S.L.", "Inc"…). Used for matching.
+  normalizedName String   @map("normalized_name")
+  domain         String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@unique([userId, normalizedName])
+  @@index([userId, domain])
+  @@map("companies")
+}
+
+model Application {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  companyId      String            @map("company_id") @db.Uuid
+  roleTitle      String            @map("role_title")
+  location       String?
+  workMode       WorkMode          @default(UNKNOWN) @map("work_mode")
+  salaryMin      Int?              @map("salary_min")
+  salaryMax      Int?              @map("salary_max")
+  salaryCurrency String?           @map("salary_currency") @db.Char(3)
+  salaryPeriod   SalaryPeriod?     @map("salary_period")
+  source         ApplicationSource @default(OTHER)
+  jobUrl         String?           @map("job_url")
+  externalJobId  String?           @map("external_job_id")
+  status         ApplicationStatus @default(APPLIED)
+  appliedAt      DateTime          @map("applied_at") @db.Timestamptz(3)
+  lastActivityAt DateTime          @map("last_activity_at") @db.Timestamptz(3)
+  origin         ApplicationOrigin @default(MANUAL)
+  needsReview    Boolean           @default(false) @map("needs_review")
+  /// Fields edited by hand that automatic processing must not overwrite.
+  lockedFields   String[]          @default([]) @map("locked_fields")
+  notes          String?
+  archived       Boolean           @default(false)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company            @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  events  ApplicationEvent[]
+
+  @@index([userId, status])
+  @@index([userId, appliedAt(sort: Desc)])
+  @@index([userId, lastActivityAt(sort: Desc)])
+  @@index([companyId])
+  @@index([jobUrl])
+  @@map("applications")
+}
+
+model ApplicationEvent {
+  id            String             @id @default(uuid(7)) @db.Uuid
+  applicationId String             @map("application_id") @db.Uuid
+  type          EventType
+  fromStatus    ApplicationStatus? @map("from_status")
+  toStatus      ApplicationStatus? @map("to_status")
+  /// When it happened (e.g. the email date), not when it was recorded.
+  occurredAt    DateTime           @map("occurred_at") @db.Timestamptz(3)
+  source        EventSource
+  summary       String?
+  metadata      Json?
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, occurredAt(sort: Desc)])
+  @@index([occurredAt(sort: Desc)])
+  @@map("application_events")
+}

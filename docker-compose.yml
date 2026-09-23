@@ -1,5 +1,6 @@
-# Local infrastructure. Apps run natively (`pnpm dev`) for fast hot reload.
-# Phase 2 adds a `full` profile that also runs api and web in containers.
+# Local infrastructure.
+#   pnpm dev                          → db in Docker, apps native with hot reload (recommended)
+#   docker compose --profile full up  → db + api in containers (production-like image)
 services:
   db:
     image: postgres:17-alpine
@@ -17,6 +18,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://jat:jat@db:5432/job_tracker
+      OWNER_EMAIL: ${OWNER_EMAIL:-owner@example.com}
+      LOG_LEVEL: info
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

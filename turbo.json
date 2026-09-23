@@ -1,26 +1,37 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "stream",
+  "globalPassThroughEnv": ["DATABASE_URL", "DOCKER_HOST", "TESTCONTAINERS_*"],
   "tasks": {
+    "generate": {
+      "inputs": ["prisma/schema.prisma"],
+      "outputs": ["src/generated/**"]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["NEXT_PUBLIC_*", "API_INTERNAL_URL"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "generate"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "generate"]
     },
     "test": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "outputs": ["coverage/**"]
     },
+    "test:integration": {
+      "dependsOn": ["^build", "generate"],
+      "cache": false
+    },
     "dev": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "generate"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["NEXT_PUBLIC_*", "API_INTERNAL_URL", "OWNER_EMAIL", "PORT", "LOG_LEVEL"]
     }
   }
 }

@@ -7,15 +7,20 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "pnpm db:up && pnpm db:migrate && turbo run dev",
+    "dev:mock": "NEXT_PUBLIC_API_MODE=mock turbo run dev --filter=@jat/web",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:up": "docker compose up -d --wait db",
-    "db:down": "docker compose down"
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @jat/api db:deploy",
+    "db:seed": "pnpm --filter @jat/api db:seed",
+    "db:studio": "pnpm --filter @jat/api db:studio"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

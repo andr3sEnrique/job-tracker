@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APPLICATION_STATUSES, CLOSED_STATUSES, isActiveStatus } from './enums';
+import { APPLICATION_STATUSES, CLOSED_STATUSES, isActiveStatus } from './enums.js';
 
 describe('isActiveStatus', () => {
   it.each(['APPLIED', 'SCREENING', 'INTERVIEWING', 'OFFER'] as const)('%s is active', (s) => {

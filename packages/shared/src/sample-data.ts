@@ -1,15 +1,14 @@
+import type { Application, ApplicationEvent } from './applications.js';
 import {
   isActiveStatus,
-  type Application,
-  type ApplicationEvent,
   type ApplicationSource,
   type ApplicationStatus,
   type EventType,
   type WorkMode,
-} from '@jat/shared';
+} from './enums.js';
 
 /**
- * Deterministic fake dataset for Phase 1 (no backend yet).
+ * Deterministic sample dataset: powers the web mock client and the database seed.
  * All company names are fictional.
  */
 
@@ -192,16 +191,16 @@ function stepsFor(final: ApplicationStatus, rng: ReturnType<typeof createRng>): 
   }
 }
 
-export interface MockDataset {
+export interface SampleDataset {
   applications: Application[];
   events: ApplicationEvent[];
 }
 
-export function generateMockDataset({
+export function generateSampleDataset({
   now = new Date(),
   count = 46,
   seed = 20260923,
-}: { now?: Date; count?: number; seed?: number } = {}): MockDataset {
+}: { now?: Date; count?: number; seed?: number } = {}): SampleDataset {
   const rng = createRng(seed);
   const applications: Application[] = [];
   const events: ApplicationEvent[] = [];

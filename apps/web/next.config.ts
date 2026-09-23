@@ -7,12 +7,18 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ];
 
+const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
-  // Phase 2: `rewrites()` will proxy /api/* to the NestJS backend (same-origin cookies, no CORS).
+  // The browser only ever talks to this origin; Next.js proxies /api/* to NestJS.
+  // Same-origin means first-party cookies (Phase 3) and no CORS to configure.
+  async rewrites() {
+    return [{ source: '/api/:path*', destination: `${API_INTERNAL_URL}/api/:path*` }];
+  },
 };
 
 export default nextConfig;

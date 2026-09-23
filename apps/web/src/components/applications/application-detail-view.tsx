@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useApplication } from '@/lib/api/queries';
 import { formatDate, formatRelative, formatSalary } from '@/lib/format';
 import { SOURCE_LABELS, WORK_MODE_LABELS } from '@/lib/labels';
+import { AddNoteForm } from './add-note-form';
+import { ApplicationActions } from './application-actions';
 import { EventTimeline } from './event-timeline';
 import { StatusBadge } from './status-badge';
 
@@ -67,15 +69,22 @@ export function ApplicationDetailView({ id }: { id: string }) {
   return (
     <div className="space-y-6">
       <BackLink />
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{app.roleTitle}</h1>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{app.roleTitle}</h1>
+            <StatusBadge status={app.status} />
+          </div>
           <p className="text-muted-foreground">
             {app.company.name}
             {app.company.domain && <span> · {app.company.domain}</span>}
           </p>
         </div>
-        <StatusBadge status={app.status} className="self-start text-sm" />
+        <ApplicationActions
+          id={app.id}
+          status={app.status}
+          label={`${app.company.name} · ${app.roleTitle}`}
+        />
       </div>
 
       {app.needsReview && (
@@ -135,9 +144,12 @@ export function ApplicationDetailView({ id }: { id: string }) {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Historial</CardTitle>
-            <CardDescription>{app.events.length} eventos</CardDescription>
+            <CardDescription>
+              {app.events.length} {app.events.length === 1 ? 'evento' : 'eventos'}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            <AddNoteForm applicationId={app.id} />
             <EventTimeline events={app.events} />
           </CardContent>
         </Card>

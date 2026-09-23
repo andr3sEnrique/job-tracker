@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { applicationSourceSchema, applicationStatusSchema } from './enums';
+import { applicationEventSchema, companySchema } from './applications.js';
+import { applicationSourceSchema, applicationStatusSchema } from './enums.js';
 
 export const statsSummarySchema = z.object({
   total: z.number().int().nonnegative(),
@@ -35,3 +36,23 @@ export const funnelSchema = z.object({
   offered: z.number().int().nonnegative(),
 });
 export type Funnel = z.infer<typeof funnelSchema>;
+
+export const recentActivityItemSchema = z.object({
+  event: applicationEventSchema,
+  application: z.object({
+    id: z.string(),
+    roleTitle: z.string(),
+    company: companySchema,
+  }),
+});
+export type RecentActivityItem = z.infer<typeof recentActivityItemSchema>;
+
+export const dashboardStatsSchema = z.object({
+  summary: statsSummarySchema,
+  timeline: z.array(timelinePointSchema),
+  statusDistribution: z.array(statusCountSchema),
+  sourceDistribution: z.array(sourceCountSchema),
+  funnel: funnelSchema,
+  recentActivity: z.array(recentActivityItemSchema),
+});
+export type DashboardStats = z.infer<typeof dashboardStatsSchema>;

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createApplicationSchema, listApplicationsQuerySchema, salarySchema } from './applications';
+import {
+  createApplicationSchema,
+  listApplicationsParamsSchema,
+  listApplicationsQuerySchema,
+  salarySchema,
+  toListApplicationsParams,
+  updateApplicationSchema,
+} from './applications.js';
 
 describe('createApplicationSchema', () => {
   it('applies defaults and trims strings', () => {
@@ -61,5 +68,43 @@ describe('listApplicationsQuerySchema', () => {
 
   it('caps page size', () => {
     expect(listApplicationsQuerySchema.safeParse({ pageSize: 500 }).success).toBe(false);
+  });
+});
+
+describe('listApplicationsParamsSchema', () => {
+  it('parses a query-string record into a typed query', () => {
+    expect(
+      listApplicationsParamsSchema.parse({
+        status: 'APPLIED,OFFER',
+        activeOnly: 'true',
+        page: '2',
+        sortBy: 'company',
+      }),
+    ).toMatchObject({ status: ['APPLIED', 'OFFER'], activeOnly: true, page: 2, sortBy: 'company' });
+  });
+
+  it('rejects unknown enum values', () => {
+    expect(listApplicationsParamsSchema.safeParse({ status: 'APPLIED,NOPE' }).success).toBe(false);
+  });
+
+  it('round-trips through toListApplicationsParams', () => {
+    const query = listApplicationsQuerySchema.parse({
+      q: 'dev',
+      source: ['LINKEDIN'],
+      activeOnly: false,
+      page: 3,
+    });
+    const params = toListApplicationsParams(query);
+    expect(listApplicationsParamsSchema.parse(params)).toEqual(query);
+  });
+});
+
+describe('updateApplicationSchema', () => {
+  it('rejects an empty patch', () => {
+    expect(updateApplicationSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('accepts a partial patch', () => {
+    expect(updateApplicationSchema.parse({ location: null })).toEqual({ location: null });
   });
 });
