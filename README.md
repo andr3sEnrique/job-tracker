@@ -1,223 +1,240 @@
 # Job Application Tracker
 
-Dashboard privado para gestionar candidaturas de empleo. El objetivo final es alimentarlo
-automáticamente desde Gmail: clasificar los emails, extraer los datos y mantener el historial de
-cada candidatura.
+A private dashboard for tracking job applications that fills itself from Gmail: it classifies
+recruiting emails, extracts the company and role, and keeps each application's history up to
+date.
 
-> **Estado: fase 8 (lista para producción).** Los emails de Gmail se clasifican con reglas
-> (EN/FR/ES) y, solo cuando las reglas dudan, con IA opcional (Claude Haiku 4.5 u Ollama) con
-> presupuesto mensual. Crean o actualizan candidaturas y su historial; la sincronización es
-> incremental y automática. El contenido de los emails nunca se guarda. Se despliega gratis en
-> Vercel + Render + Neon ([guía](docs/deploy.md)). Ver el [plan técnico](docs/PLAN_TECNICO.md) y
-> las [decisiones de arquitectura](docs/adr/README.md).
+> **Status: phase 8 (production-ready).** Gmail messages are classified with rules (EN/FR/ES)
+> and, only when the rules are unsure, with optional AI (Claude Haiku 4.5 or Ollama) under a
+> monthly budget. They create or update applications and their timeline; sync is incremental and
+> automatic. Email content is never stored. Deploys for free on Vercel + Render + Neon
+> ([guide](docs/deploy.md), in Spanish). See the [technical plan](docs/PLAN_TECNICO.md) and the
+> [architecture decision records](docs/adr/README.md) (both in Spanish).
 
 ## Stack
 
-| Capa     | Tecnología                                                                                   |
+| Layer    | Technology                                                                                   |
 | -------- | -------------------------------------------------------------------------------------------- |
 | Monorepo | pnpm workspaces + Turborepo                                                                  |
 | Web      | Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, TanStack Query/Table, Recharts |
-| Shared   | Zod 4: enums y contratos compartidos por web y api                                           |
-| Api      | NestJS + Prisma + PostgreSQL                                                                 |
-| IA       | Puerto propio con adaptadores Anthropic (Claude Haiku 4.5) y Ollama, opcional                |
-| Calidad  | TypeScript strict, ESLint, Prettier, Vitest, Testcontainers, Playwright, GitHub Actions      |
-| Deploy   | Vercel (web) + Render Docker (api) + Neon (Postgres) + cron en GitHub Actions                |
+| Shared   | Zod 4: enums and API contracts shared by web and api                                         |
+| API      | NestJS + Prisma + PostgreSQL                                                                 |
+| AI       | Own port with Anthropic (Claude Haiku 4.5) and Ollama adapters, optional                     |
+| Quality  | Strict TypeScript, ESLint, Prettier, Vitest, Testcontainers, Playwright, GitHub Actions      |
+| Deploy   | Vercel (web) + Render Docker (api) + Neon (Postgres) + GitHub Actions cron                   |
 
-## Estructura
+## Structure
 
 ```
 apps/
-  web/                  Next.js: dashboard (proxy /api/* → api)
-  api/                  NestJS: REST API, Prisma schema, migraciones y seed
+  web/                  Next.js: dashboard (proxies /api/* → api)
+  api/                  NestJS: REST API, Prisma schema, migrations and seed
 packages/
-  shared/               Enums y schemas Zod (contratos de la API)
-  tsconfig/             tsconfig base compartidos
-  eslint-config/        Config ESLint compartida
-docs/                   Plan técnico, despliegue y ADRs
-docker-compose.yml      PostgreSQL local (+ perfil `full` con la API en contenedor)
-render.yaml             Blueprint de Render para la API
+  shared/               Enums and Zod schemas (API contracts)
+  tsconfig/             Shared base tsconfigs
+  eslint-config/        Shared ESLint config
+docs/                   Technical plan, deployment guide and ADRs
+docker-compose.yml      Local PostgreSQL (+ `full` profile with the API in a container)
+render.yaml             Render Blueprint for the API
 ```
 
-## Requisitos
+## Requirements
 
-- Node.js 22 LTS o superior (`nvm use` lee `.nvmrc`)
+- Node.js 22 LTS or later (`nvm use` reads `.nvmrc`)
 - pnpm 10 (`corepack enable pnpm`)
-- Docker (PostgreSQL local y tests de integración)
+- Docker (local PostgreSQL and integration tests)
 
-## Puesta en marcha
+## Getting started
 
 ```bash
 pnpm install
-pnpm dev          # levanta PostgreSQL, aplica migraciones y arranca api + web
-pnpm db:seed      # (opcional) carga 46 candidaturas de ejemplo
+pnpm dev          # starts PostgreSQL, applies migrations, runs api + web
+pnpm db:seed      # (optional) loads 46 sample applications
 ```
 
 - Web: http://localhost:3000
 - API: http://localhost:4000/api/v1 (health: `/api/v1/health/ready`)
 
-Para iniciar sesión necesitas un cliente OAuth de Google y tu email en la allowlist: sigue
-[docs/setup-google-cloud.md](docs/setup-google-cloud.md) (5 minutos) y copia
-[.env.example](.env.example) a `.env`. El resto de variables tienen valores por defecto.
+To sign in you need a Google OAuth client and your email in the allowlist: follow
+[docs/setup-google-cloud.md](docs/setup-google-cloud.md) (5 minutes, in Spanish) and copy
+[.env.example](.env.example) to `.env`. Every other variable has a default.
 
-Para trabajar solo en la UI, sin API ni login: `pnpm dev:mock`.
+To work on the UI only, without the API or signing in: `pnpm dev:mock`.
 
 ## Scripts
 
-| Script                  | Qué hace                                                              |
-| ----------------------- | --------------------------------------------------------------------- |
-| `pnpm dev`              | PostgreSQL + migraciones + api y web en modo watch                    |
-| `pnpm dev:mock`         | Solo la web, con datos en memoria                                     |
-| `pnpm build`            | Build de producción de todo el workspace                              |
-| `pnpm lint`             | ESLint en todos los paquetes                                          |
-| `pnpm typecheck`        | `tsc --noEmit` (genera antes el cliente Prisma y los tipos de rutas)  |
-| `pnpm test`             | Tests unitarios y de componentes (Vitest)                             |
-| `pnpm test:integration` | Tests de la API contra PostgreSQL real (Testcontainers)               |
-| `pnpm test:e2e`         | Playwright (escritorio y móvil) contra un build de producción en mock |
-| `pnpm db:seed`          | Datos de ejemplo (`-- --force` los reemplaza, `-- --clear` los borra) |
-| `pnpm db:studio`        | Prisma Studio                                                         |
-| `pnpm format`           | Prettier                                                              |
+| Script                  | What it does                                                         |
+| ----------------------- | -------------------------------------------------------------------- |
+| `pnpm dev`              | PostgreSQL + migrations + api and web in watch mode                  |
+| `pnpm dev:mock`         | Web only, with in-memory data                                        |
+| `pnpm build`            | Production build of the whole workspace                              |
+| `pnpm lint`             | ESLint in every package                                              |
+| `pnpm typecheck`        | `tsc --noEmit` (generates the Prisma client and route types first)   |
+| `pnpm test`             | Unit and component tests (Vitest)                                    |
+| `pnpm test:integration` | API tests against a real PostgreSQL (Testcontainers)                 |
+| `pnpm test:e2e`         | Playwright (desktop and mobile) against a production build, mock API |
+| `pnpm db:seed`          | Sample data (`-- --force` replaces it, `-- --clear` removes it)      |
+| `pnpm db:studio`        | Prisma Studio                                                        |
+| `pnpm format`           | Prettier                                                             |
+
+## Deployment (free)
+
+The whole app runs on free tiers, no credit card required:
+
+| Piece       | Service                    | Notes                                                      |
+| ----------- | -------------------------- | ---------------------------------------------------------- |
+| Web         | **Vercel** Hobby           | Next.js; proxies `/api/*` to the API (same-origin cookies) |
+| API         | **Render** Free (Docker)   | Sleeps after ~15 min idle; wakes in 30–60 s                |
+| Database    | **Neon** Free (PostgreSQL) | Pooled URL for the app, direct URL for migrations          |
+| Auto-sync   | **GitHub Actions** cron    | Calls `POST /api/v1/internal/sync` every 30 min            |
+| Login/Gmail | **Google Cloud** OAuth     | Free, no billing account                                   |
+
+Order: Neon → Render (`New → Blueprint` reads [`render.yaml`](render.yaml)) → Vercel (root
+directory `apps/web`, [`vercel.json`](apps/web/vercel.json)) → production OAuth client in
+Google Cloud → `SYNC_URL` and `CRON_SECRET` repository secrets. Step-by-step instructions and a
+final checklist: [docs/deploy.md](docs/deploy.md).
 
 ## API
 
-Todas las rutas cuelgan de `/api/v1` y validan la entrada con los schemas Zod de `@jat/shared`.
+Every route lives under `/api/v1` and validates its input with the Zod schemas in `@jat/shared`.
 
-| Método | Ruta                            | Descripción                                             |
-| ------ | ------------------------------- | ------------------------------------------------------- |
-| GET    | `/applications`                 | Listado con búsqueda, filtros, orden y paginación       |
-| POST   | `/applications`                 | Alta manual (crea el evento inicial)                    |
-| GET    | `/applications/:id`             | Detalle con historial de eventos                        |
-| PATCH  | `/applications/:id`             | Edición parcial (bloquea los campos editados)           |
-| POST   | `/applications/:id/status`      | Cambio de estado (registra un evento)                   |
-| POST   | `/applications/:id/notes`       | Añade una nota al historial                             |
-| DELETE | `/applications/:id`             | Borra la candidatura y su historial                     |
-| GET    | `/stats/dashboard`              | KPIs, series y actividad reciente                       |
-| GET    | `/gmail/connect`                | Autoriza acceso de solo lectura a Gmail (PKCE)          |
-| GET    | `/gmail/callback`               | Guarda el refresh token cifrado                         |
-| GET    | `/gmail/status`                 | Estado de la conexión, recuentos y última sync          |
-| DELETE | `/gmail`                        | Revoca el acceso y borra los emails guardados           |
-| DELETE | `/account`                      | Revoca Gmail y borra la cuenta y todos sus datos        |
-| POST   | `/sync/run`                     | Procesa un tramo de la sincronización (`hasMore`)       |
-| POST   | `/internal/sync`                | Sync de todos los buzones + mantenimiento (cron)        |
-| GET    | `/ai/status`                    | Proveedor, modelo y gasto del mes frente al presupuesto |
-| GET    | `/emails`                       | Emails relevantes, su clasificación y candidatura       |
-| POST   | `/emails/:id/resolve`           | Revisión: confirmar, ignorar, asignar o crear           |
-| POST   | `/emails/reprocess`             | Rehace todo lo derivado de emails (conserva lo manual)  |
-| GET    | `/health/live`, `/health/ready` | Liveness y readiness (públicas)                         |
+| Method | Route                           | Description                                                 |
+| ------ | ------------------------------- | ----------------------------------------------------------- |
+| GET    | `/applications`                 | List with search, filters, sorting and pagination           |
+| POST   | `/applications`                 | Manual entry (creates the initial event)                    |
+| GET    | `/applications/:id`             | Detail with its event history                               |
+| PATCH  | `/applications/:id`             | Partial update (locks the edited fields)                    |
+| POST   | `/applications/:id/status`      | Status change (records an event)                            |
+| POST   | `/applications/:id/notes`       | Adds a note to the history                                  |
+| DELETE | `/applications/:id`             | Deletes the application and its history                     |
+| GET    | `/stats/dashboard`              | KPIs, time series and recent activity                       |
+| GET    | `/gmail/connect`                | Grants read-only Gmail access (PKCE)                        |
+| GET    | `/gmail/callback`               | Stores the encrypted refresh token                          |
+| GET    | `/gmail/status`                 | Connection status, counts and last sync                     |
+| DELETE | `/gmail`                        | Revokes access and deletes stored emails                    |
+| DELETE | `/account`                      | Revokes Gmail and deletes the account and its data          |
+| POST   | `/sync/run`                     | Runs one chunk of the sync (`hasMore`)                      |
+| POST   | `/internal/sync`                | Syncs every mailbox + maintenance (cron)                    |
+| GET    | `/ai/status`                    | Provider, model and this month's spend vs budget            |
+| GET    | `/emails`                       | Relevant emails, their classification and application       |
+| POST   | `/emails/:id/resolve`           | Review: confirm, ignore, assign or create                   |
+| POST   | `/emails/reprocess`             | Rebuilds everything derived from emails (keeps manual work) |
+| GET    | `/health/live`, `/health/ready` | Liveness and readiness (public)                             |
 
-**Seguridad** (resumen; detalle en el [plan técnico §10](docs/PLAN_TECNICO.md#10-seguridad)):
+**Security** (summary; details in the [technical plan §10](docs/PLAN_TECNICO.md#10-seguridad)):
 
-- **Web:** CSP con nonce por petición (`script-src 'nonce-…' 'strict-dynamic'`, sin
-  `unsafe-inline` para scripts), HSTS, `frame-ancestors 'none'`, `X-Frame-Options`, COOP y
-  `Permissions-Policy`. Los E2E fallan si la CSP bloquea algo.
-- **API:** helmet, Zod en cada entrada, rate limits (login 10/min, sync/cron/reprocess 30/min,
-  resto 300/min), logs sin cabeceras, query strings ni textos de emails.
-- **Dependencias:** Dependabot y `pnpm audit --prod` en CI (falla con vulnerabilidades altas).
-- **Datos:** borrado completo de la cuenta desde Ajustes; política de privacidad pública en
-  `/privacy`.
+- **Web:** per-request nonce CSP (`script-src 'nonce-…' 'strict-dynamic'`, no `unsafe-inline`
+  for scripts), HSTS, `frame-ancestors 'none'`, `X-Frame-Options`, COOP and
+  `Permissions-Policy`. The E2E tests fail if the CSP blocks anything.
+- **API:** helmet, Zod on every input, rate limits (login 10/min, sync/cron/reprocess 30/min,
+  everything else 300/min), logs without headers, query strings or email text.
+- **Dependencies:** Dependabot and `pnpm audit --prod` in CI (fails on high vulnerabilities).
+- **Data:** full account deletion from Settings; public privacy policy at `/privacy`.
 
-Todas las rutas exigen sesión salvo `health`, el login y `/internal/sync` (guard global que
-deniega por defecto). `/internal/sync` no usa cookies: exige la cabecera
-`X-Cron-Secret` (comparada en tiempo constante) y no existe si `CRON_SECRET` no está definido. Las peticiones que modifican datos requieren además la cabecera
-`X-Requested-With` y un `Origin` válido (CSRF), y el login tiene rate limiting. Detalles en
+Every route requires a session except `health`, sign-in and `/internal/sync` (a global guard
+that denies by default). `/internal/sync` does not use cookies: it requires the `X-Cron-Secret`
+header (compared in constant time) and does not exist unless `CRON_SECRET` is set.
+State-changing requests also require the `X-Requested-With` header and a valid `Origin`
+(CSRF), and sign-in is rate limited. Details in
 [docs/setup-google-cloud.md](docs/setup-google-cloud.md#cómo-se-protege-el-acceso).
 
-## Cómo se procesa un email
+## How an email is processed
 
 ```
-Gmail ─► prefiltro (cabeceras) ─► metadatos guardados
-                                    │  al sincronizar, de más antiguo a más reciente:
-                                    ▼
-      cuerpo (solo en memoria) ─► clasificador ─► extractor ─► asociación ─► evento
-                                   (reglas)       empresa,      hilo → URL →    + estado
-                                                  puesto, URL   empresa+puesto  recalculado
+Gmail ─► prefilter (headers) ─► metadata stored
+                                  │  on sync, oldest first:
+                                  ▼
+      body (in memory only) ─► classifier ─► extractor ─► matching ─► event
+                                (rules)      company,     thread → URL →   + status
+                                             role, URL    company+role     recomputed
 ```
 
-- **Clasificador** (`apps/api/src/classification`): reglas por prioridad (rechazo > oferta >
-  técnica > entrevista > envío > confirmación > alerta > recruiter).
-- **IA como segunda opinión** (`apps/api/src/ai`, opcional): solo si las reglas dan `UNKNOWN`,
-  una confianza baja o un email de candidatura sin empresa o puesto. Ver
-  [IA](#ia-opcional).
-- **Estado derivado del historial**: el estado de una candidatura se recalcula reproduciendo
-  sus eventos con una máquina de estados que solo avanza, así que el orden de llegada de los
-  emails no importa y deshacer (ignorar un email) es consistente.
-- **Lo manual gana**: los campos editados a mano nunca se sobrescriben con datos de emails.
-- **Evaluación**: `fake-mailbox.data.ts` contiene emails sintéticos EN/FR/ES con la categoría,
-  empresa y puesto esperados; `dataset.spec.ts` exige acertarlos todos. Cuando un email real se
-  clasifique mal, se añade aquí una versión anonimizada.
+- **Classifier** (`apps/api/src/classification`): prioritised rules (rejection > offer >
+  technical > interview > submitted > confirmation > alert > recruiter).
+- **AI as a second opinion** (`apps/api/src/ai`, optional): only when the rules return
+  `UNKNOWN`, low confidence, or an application email without a company or role. See
+  [AI](#ai-optional).
+- **Status derived from history**: an application's status is recomputed by replaying its
+  events through a forward-only state machine, so email arrival order does not matter and undo
+  (ignoring an email) is consistent.
+- **Manual edits win**: fields edited by hand are never overwritten by email data.
+- **Evaluation**: `fake-mailbox.data.ts` holds synthetic EN/FR/ES emails with the expected
+  category, company and role; `dataset.spec.ts` requires all of them to be right. When a real
+  email is misclassified, an anonymised version is added there.
 
-## IA (opcional)
+## AI (optional)
 
 ```
-EmailAnalyzer (híbrido) ─► reglas ─► ¿seguras? ── sí ──► resultado
-                                         │ no
-                                         ▼
-                           AiEmailAnalyzer (dominio: prompt versionado, presupuesto, ai_runs)
-                                         │
-                           LlmProvider (puerto genérico: texto + schema Zod → objeto validado)
-                               ├─ AnthropicProvider (tool use forzado)
-                               ├─ OllamaProvider (local, gratis)
-                               └─ FakeLlmProvider (tests)
+EmailAnalyzer (hybrid) ─► rules ─► confident? ── yes ──► result
+                                       │ no
+                                       ▼
+                         AiEmailAnalyzer (domain: versioned prompt, budget, ai_runs)
+                                       │
+                         LlmProvider (generic port: text + Zod schema → validated object)
+                             ├─ AnthropicProvider (forced tool use)
+                             ├─ OllamaProvider (local, free)
+                             └─ FakeLlmProvider (tests)
 ```
 
-- **Desactivada por defecto** (`AI_PROVIDER=none`): nada sale del servidor.
-- **Qué se envía**: asunto, dominio del remitente y el cuerpo limpio, recortado a 4.000
-  caracteres y **anonimizado**: sin direcciones de email, teléfonos ni query strings de los
-  enlaces. El email se trata como dato no fiable (el prompt ignora instrucciones que contenga).
-- **Nunca se inventa**: la salida se valida siempre con Zod; si no cuadra se registra
-  `INVALID_OUTPUT` y se usan las reglas. Una URL que no aparece en el email se descarta.
-- **Coste**: `ai_runs` registra tokens, latencia y coste de cada llamada. Hace de caché
-  (reprocesar no vuelve a pagar) y de circuit breaker: al llegar a `AI_MONTHLY_BUDGET_USD` se
-  vuelve a solo reglas hasta el mes siguiente. Con Haiku 4.5 cuesta unos 0,2 céntimos de dólar por
-  email, y solo llegan los dudosos.
-- **Evaluación**: `pnpm --filter @jat/api eval:ai` mide la IA frente a las reglas sobre el
-  dataset sintético y los casos anonimizados (categoría, empresa y puesto) y estima el coste. Se
-  lanza a mano: gasta tokens reales.
+- **Off by default** (`AI_PROVIDER=none`): nothing leaves the server.
+- **What is sent**: subject, sender domain and the cleaned body, truncated to 4,000 characters
+  and **redacted**: no email addresses, phone numbers or link query strings. The email is
+  treated as untrusted data (the prompt ignores any instructions it contains).
+- **Nothing is made up**: the output is always validated with Zod; if it does not fit,
+  `INVALID_OUTPUT` is recorded and the rules are used. A URL that is not in the email is dropped.
+- **Cost**: `ai_runs` records tokens, latency and cost of every call. It acts as a cache
+  (reprocessing does not pay twice) and as a circuit breaker: once `AI_MONTHLY_BUDGET_USD` is
+  reached, only rules are used until next month. With Haiku 4.5 it costs about $0.002 per
+  email, and only the uncertain ones get there.
+- **Evaluation**: `pnpm --filter @jat/api eval:ai` measures the AI against the rules on the
+  synthetic dataset and the anonymised cases (category, company and role) and estimates the
+  cost. Run by hand: it spends real tokens.
 
-## Sincronización automática
+## Automatic sync
 
-| Tipo          | Cuándo                                                  | Cómo                                    |
-| ------------- | ------------------------------------------------------- | --------------------------------------- |
-| `INITIAL`     | Primera vez                                             | Búsqueda de los últimos 180 días        |
-| `RESCAN`      | Cambiaron las reglas del prefiltro                      | Igual, reevaluando lo descartado        |
-| `INCREMENTAL` | Resto de veces                                          | History API desde el último `historyId` |
-| `FALLBACK`    | Gmail ya no tiene ese historial (≈ 1 semana, error 404) | Búsqueda desde la última sync − 1 día   |
+| Type          | When                                             | How                                   |
+| ------------- | ------------------------------------------------ | ------------------------------------- |
+| `INITIAL`     | First time                                       | Search over the last 180 days         |
+| `RESCAN`      | The prefilter rules changed                      | Same, re-evaluating discarded mail    |
+| `INCREMENTAL` | Every other time                                 | History API from the last `historyId` |
+| `FALLBACK`    | Gmail no longer has that history (≈ 1 week, 404) | Search since the last sync − 1 day    |
 
-- **Quién la lanza** (`sync_runs.trigger`): el botón (`USER`), el temporizador interno
-  (`SCHEDULER`, con `SCHEDULER_ENABLED=true`) o un cron externo (`CRON`) que llama a
-  `POST /api/v1/internal/sync`. En hosting gratuito la instancia se duerme y un temporizador
-  interno no corre, así que en producción se usa el cron:
-  [`.github/workflows/sync-cron.yml`](.github/workflows/sync-cron.yml) (secretos
-  `SYNC_URL` y `CRON_SECRET`) o cualquier servicio tipo cron-job.org.
-- **Tramos y reanudación**: cada llamada procesa un tramo acotado en tiempo; el checkpoint vive en
-  `sync_runs`, y un lock con caducidad evita que el botón y el cron procesen lo mismo a la vez.
-- **Mantenimiento** tras cada sync automática: las candidaturas en `APPLIED`/`SCREENING` sin
-  actividad en 30 días (`GHOSTED_AFTER_DAYS`) pasan a `GHOSTED` con un evento `SYSTEM` (cualquier
-  email posterior las reabre), y se borran las sesiones caducadas.
+- **Who triggers it** (`sync_runs.trigger`): the button (`USER`), the in-process timer
+  (`SCHEDULER`, with `SCHEDULER_ENABLED=true`) or an external cron (`CRON`) calling
+  `POST /api/v1/internal/sync`. On free hosting the instance sleeps and an in-process timer does
+  not run, so production uses the cron:
+  [`.github/workflows/sync-cron.yml`](.github/workflows/sync-cron.yml) (secrets `SYNC_URL` and
+  `CRON_SECRET`) or any service like cron-job.org.
+- **Chunks and resuming**: each call processes a time-bounded chunk; the checkpoint lives in
+  `sync_runs`, and an expiring lock stops the button and the cron from processing the same mail
+  at once.
+- **Maintenance** after each automatic sync: applications in `APPLIED`/`SCREENING` with no
+  activity for 30 days (`GHOSTED_AFTER_DAYS`) become `GHOSTED` through a `SYSTEM` event (any
+  later email reopens them), and expired sessions are deleted.
 
-## Cómo está organizada la web
+## How the web app is organised
 
-- **`src/lib/api`**: interfaz `ApiClient` con dos implementaciones: HTTP (valida cada respuesta
-  con Zod) y mock en memoria (`NEXT_PUBLIC_API_MODE=mock`).
-- **Proxy**: `next.config.ts` reescribe `/api/*` hacia la API, así que el navegador solo habla con
-  un origen (sin CORS y con la cookie de sesión como cookie de primera parte).
-- **`src/proxy.ts`**: redirige a `/login` si no hay cookie de sesión. Es solo UX; quien autoriza
-  es la API.
-- **`src/lib/mocks`**: dataset determinista y la lógica de filtrado y estadísticas, con tests.
-  Sirve de referencia para los endpoints de la API.
-- **Estado en la URL**: filtros, orden y paginación de `/applications` viven en los search params,
-  validados con los schemas de `@jat/shared`.
-- **Responsive**: la sidebar pasa a drawer y la tabla a tarjetas por debajo de `md`.
+- **`src/lib/api`**: an `ApiClient` interface with two implementations: HTTP (validates every
+  response with Zod) and in-memory mock (`NEXT_PUBLIC_API_MODE=mock`).
+- **Proxy**: `next.config.ts` rewrites `/api/*` to the API, so the browser only talks to one
+  origin (no CORS, and the session cookie is first-party).
+- **`src/proxy.ts`**: sets the CSP nonce and redirects to `/login` when there is no session
+  cookie. The redirect is UX only; the API is what authorises.
+- **`src/lib/mocks`**: deterministic dataset plus the filtering and statistics logic, with
+  tests. It is the reference for the API endpoints.
+- **State in the URL**: filters, sorting and pagination of `/applications` live in the search
+  params, validated with the `@jat/shared` schemas.
+- **Responsive**: the sidebar becomes a drawer and the table becomes cards below `md`.
 
 ## Roadmap
 
 1. ~~Foundation + frontend~~
-2. ~~Backend (NestJS) + base de datos~~
-3. ~~Autenticación (Google OAuth, allowlist en backend)~~
-4. ~~Integración con Gmail~~
-5. ~~Clasificación de emails (reglas)~~
-6. ~~Sincronización automática~~
-7. ~~Clasificación y extracción con IA~~
-8. **Endurecimiento para producción** ← _actual_: CSP, borrado de cuenta, páginas públicas,
-   E2E, auditoría de dependencias, blueprint de despliegue y ADRs. Pendiente y opcional:
-   Sentry, métricas en Grafana, backups `pg_dump` cifrados y rotación de la clave de cifrado sin
-   reconectar Gmail.
+2. ~~Backend (NestJS) + database~~
+3. ~~Authentication (Google OAuth, backend allowlist)~~
+4. ~~Gmail integration~~
+5. ~~Email classification (rules)~~
+6. ~~Automatic sync~~
+7. ~~AI classification and extraction~~
+8. ~~Production hardening~~: CSP, account deletion, public pages, E2E, dependency audit,
+   deployment blueprint and ADRs. Optional next steps: Sentry, Grafana metrics, encrypted
+   `pg_dump` backups, and rotating the encryption key without reconnecting Gmail.
