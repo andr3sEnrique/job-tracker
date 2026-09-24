@@ -11,4 +11,5 @@ configureApp(app);
 
 const port = app.get(AppConfig).get('PORT');
 await app.listen(port);
-app.get(Logger).log(`API listening on http://localhost:${port}`);
+// Bound to every interface (the platform's proxy reaches the container from outside).
+app.get(Logger).log(`API listening on port ${port}`);
