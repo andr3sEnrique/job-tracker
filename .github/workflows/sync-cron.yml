@@ -3,7 +3,8 @@
 # Needs two repository secrets:
 #   SYNC_URL     e.g. https://your-app.example/api/v1/internal/sync
 #   CRON_SECRET  the same value as the API's CRON_SECRET
-# Without them the job does nothing (so forks and a not-yet-deployed app stay green).
+# Without them the scheduled job does nothing (forks and a not-yet-deployed app stay green),
+# but a manual run fails, so a missing secret is noticed.
 name: Automatic sync
 
 on:
@@ -28,7 +29,9 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$SYNC_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "SYNC_URL / CRON_SECRET not configured: skipping."
+            echo "::warning::SYNC_URL / CRON_SECRET repository secrets are not configured."
+            # Scheduled runs skip quietly; a manual run is a test, so it must fail loudly.
+            [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && exit 1
             exit 0
           fi
           # A sleeping instance can take a while to boot: generous timeout and retries.
