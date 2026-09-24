@@ -98,6 +98,30 @@ const CLOSED = anyOf([
   /\boffre (a ete )?(pourvue|cloturee)\b/,
 ]);
 
+// --- Your data: consent to keep it, or notice that it was deleted ---------------------------
+// Asks for an action ("extend your consent"), unlike a rejection that merely mentions the
+// talent pool, which the rejection rule has already caught by the time this one runs.
+
+const DATA_CONSENT_SUBJECT = anyOf([
+  /\bpouvons[- ]nous vous garder\b/,
+  /\bkeep your\b.{0,40}\b(profile|data|information|details)\b/,
+  /\b(stay|remain) in (our )?talent (pool|community)\b/,
+  /\b(suppression|effacement) de vos donnees\b/,
+  /\byour (personal )?(data|information) (has been|will be|was) (deleted|removed|erased)\b/,
+  /\b(eliminacion|supresion|borrado) de (tus|sus) datos\b/,
+  /\b(conservation|retention) (de vos|of your) (donnees|data)\b|\bdata retention\b/,
+  /\b(gdpr|rgpd)\b/,
+]);
+
+const DATA_CONSENT_TEXT = anyOf([
+  /\b(prolonger|renouveler|confirmer|retirer) (l'|votre )?(autorisation|consentement)\b/,
+  /\bpermission de conserver\b/,
+  /\b(extend|renew|confirm|withdraw) (your )?(consent|permission)\b/,
+  /\b(consent|permission) (for us )?to (keep|retain|store|hold) (your )?(data|information|profile|details)\b/,
+  /\b(renovar|ampliar|confirmar) (tu|su) consentimiento\b/,
+  /\bconsentimiento para (conservar|mantener|guardar)\b/,
+]);
+
 // --- Account and platform housekeeping (subject only) ---------------------------------------
 
 const ACCOUNT_SUBJECT = anyOf([
@@ -249,6 +273,13 @@ const RULES: Rule[] = [
     test: (c) => ALERT_SENDER.test(c.fromEmail) || ALERT_SUBJECT(c.subject),
   },
   { id: 'rejection', category: 'REJECTION', confidence: 0.9, test: (c) => isRejection(c.text) },
+  // Before "account" (which knows "données personnelles") and "closed" (talent pool).
+  {
+    id: 'data-consent',
+    category: 'DATA_CONSENT',
+    confidence: 0.85,
+    test: (c) => DATA_CONSENT_SUBJECT(c.subject) || DATA_CONSENT_TEXT(c.text),
+  },
   {
     id: 'account',
     category: 'IRRELEVANT',
@@ -316,7 +347,7 @@ const RULES: Rule[] = [
 ];
 
 export class RulesClassifier extends EmailClassifier {
-  readonly id = 'rules@2';
+  readonly id = 'rules@3';
 
   classify(email: PreparedEmail): Classification {
     const fromEmail = email.fromEmail ?? '';

@@ -67,7 +67,7 @@ function mockEmails(): EmailSummary[] {
         applicationId: e.applicationId,
         applicationLabel: app ? `${app.company.name} · ${app.roleTitle}` : null,
         confidence: 0.85,
-        classifier: 'rules@2',
+        classifier: 'rules@3',
         gmailUrl: null,
       };
     }));
@@ -194,7 +194,7 @@ export const mockApiClient: ApiClient = {
       enabled: true,
       provider: 'anthropic',
       model: 'claude-haiku-4-5',
-      promptVersion: 'prompt-v1',
+      promptVersion: 'prompt-v2',
       monthlyBudgetUsd: 1,
       spentThisMonthUsd: 0.0132,
       callsThisMonth: 9,
@@ -229,7 +229,9 @@ export const mockApiClient: ApiClient = {
   reprocessEmails: () => delay({ emailsReset: mockEmails().length, applicationsRemoved: 0 }),
 
   listEmails: (query) => {
-    const all = mockEmails();
+    const all = mockEmails().filter(
+      (e) => !query.category?.length || (e.category && query.category.includes(e.category)),
+    );
     const start = (query.page - 1) * query.pageSize;
     return delay({
       items: all.slice(start, start + query.pageSize),

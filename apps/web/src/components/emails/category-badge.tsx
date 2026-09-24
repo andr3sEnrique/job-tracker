@@ -5,6 +5,8 @@ import { CATEGORY_LABELS } from '@/lib/labels';
 
 const TONE: Partial<Record<EmailCategory, string>> = {
   OFFER: 'var(--status-offer)',
+  // Needs a decision from you, like a recruiter reply.
+  DATA_CONSENT: 'var(--status-screening)',
   REJECTION: 'var(--status-rejected)',
   INTERVIEW: 'var(--status-interviewing)',
   TECHNICAL_INTERVIEW: 'var(--status-interviewing)',

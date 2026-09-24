@@ -108,6 +108,8 @@ enum EmailCategory {
   TECHNICAL_INTERVIEW
   REJECTION
   OFFER
+  /// GDPR consent / talent-pool retention requests and data-deletion notices.
+  DATA_CONSENT
   JOB_ALERT
   IRRELEVANT
   UNKNOWN

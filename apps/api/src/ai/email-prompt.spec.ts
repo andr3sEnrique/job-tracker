@@ -48,3 +48,13 @@ describe('buildEmailPrompt', () => {
     expect(prompt.length).toBeLessThan(4500);
   });
 });
+
+describe('redact performance', () => {
+  it('stays linear on long runs of word characters (no catastrophic backtracking)', () => {
+    const started = performance.now();
+    redact('x'.repeat(50_000));
+    redact(`${'a.'.repeat(20_000)}@`);
+    // The quadratic version took ~15 s on less text; 2 s leaves room for a busy CI machine.
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+});

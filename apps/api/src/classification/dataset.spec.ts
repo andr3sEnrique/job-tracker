@@ -81,7 +81,10 @@ describe('regression cases from real mailboxes (anonymised)', () => {
 
   it.each(
     prepared.filter(
-      (c) => !c.expected.company && !['IRRELEVANT', 'JOB_ALERT'].includes(c.expected.category),
+      // Categories that never touch an application do not need a company.
+      (c) =>
+        !c.expected.company &&
+        !['IRRELEVANT', 'JOB_ALERT', 'DATA_CONSENT'].includes(c.expected.category),
     ),
   )('$key → no made-up company', ({ email }) => {
     expect(extractJobData(email).company).toBeNull();

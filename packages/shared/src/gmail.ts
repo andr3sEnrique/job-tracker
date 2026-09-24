@@ -103,6 +103,7 @@ export type EmailSummary = z.infer<typeof emailSummarySchema>;
 
 export const listEmailsQuerySchema = z.object({
   status: z.array(emailProcessingStatusSchema).optional(),
+  category: z.array(emailCategorySchema).optional(),
   page: z.number().int().min(1).default(1),
   pageSize: z.number().int().min(1).max(100).default(25),
 });
@@ -115,6 +116,10 @@ export const listEmailsParamsSchema = z.preprocess((raw) => {
   return {
     status:
       typeof r.status === 'string' && r.status ? r.status.split(',').filter(Boolean) : undefined,
+    category:
+      typeof r.category === 'string' && r.category
+        ? r.category.split(',').filter(Boolean)
+        : undefined,
     page: num(r.page),
     pageSize: num(r.pageSize),
   };

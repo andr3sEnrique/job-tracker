@@ -1,6 +1,6 @@
 'use client';
 
-import type { EmailProcessingStatus, EmailSummary } from '@jat/shared';
+import type { EmailCategory, EmailProcessingStatus, EmailSummary } from '@jat/shared';
 import { ExternalLink, Inbox, MailX } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -26,9 +26,16 @@ import { EmailActions } from './email-actions';
 
 const PAGE_SIZE = 25;
 
-const TABS: { value: string; label: string; status?: EmailProcessingStatus[] }[] = [
+const TABS: {
+  value: string;
+  label: string;
+  status?: EmailProcessingStatus[];
+  category?: EmailCategory[];
+}[] = [
   { value: 'review', label: 'Revisar', status: ['NEEDS_REVIEW'] },
   { value: 'all', label: 'Todos' },
+  // Companies asking to keep your data: they need a decision from you (in Gmail).
+  { value: 'data', label: 'Tus datos', category: ['DATA_CONSENT'] },
   { value: 'pending', label: 'Pendientes', status: ['PENDING', 'FAILED'] },
 ];
 
@@ -76,8 +83,13 @@ export function EmailsView() {
   // Land on "review" when there is something to review.
   const tab = params.get('tab') ?? (reviewCount > 0 ? 'review' : 'all');
   const [page, setPage] = useState(1);
-  const status = TABS.find((t) => t.value === tab)?.status;
-  const { data, isPending, isError, refetch } = useEmails({ status, page, pageSize: PAGE_SIZE });
+  const { status, category } = TABS.find((t) => t.value === tab) ?? {};
+  const { data, isPending, isError, refetch } = useEmails({
+    status,
+    category,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
   const selectTab = (value: string) => {
     setPage(1);

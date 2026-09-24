@@ -6,9 +6,32 @@ test('the dashboard shows the summary of the search', async ({ page }) => {
   await expect(page.getByText('Actividad reciente')).toBeVisible();
 });
 
+test('clicking a status bar opens the applications with that status', async ({ page }) => {
+  await page.goto('/');
+  const chart = page.locator('[data-slot="card"]', { hasText: 'Distribución por estado' });
+  const bar = chart.locator('.recharts-bar-rectangle path').first();
+  await expect(bar).toBeVisible();
+  await bar.click();
+  await expect(page).toHaveURL(/\/applications\?status=[A-Z]+$/);
+  await expect(page.getByRole('heading', { name: 'Candidaturas' })).toBeVisible();
+});
+
+test('emails can be filtered to data-consent requests', async ({ page }) => {
+  await page.goto('/emails?tab=data');
+  await expect(page.getByRole('tab', { name: 'Tus datos' })).toHaveAttribute(
+    'data-state',
+    'active',
+  );
+});
+
 test('applications can be searched', async ({ page }) => {
   await page.goto('/applications');
   await expect(page.getByRole('heading', { name: 'Candidaturas' })).toBeVisible();
+  // Rows come from the client-side API: once they are there, the page is hydrated and the
+  // search box reacts to typing.
+  await expect(
+    page.locator('a[href^="/applications/"]:not([href$="/new"]):visible').first(),
+  ).toBeVisible();
   const search = page
     .getByRole('searchbox', { name: 'Buscar candidaturas' })
     .or(page.getByRole('textbox', { name: 'Buscar candidaturas' }));

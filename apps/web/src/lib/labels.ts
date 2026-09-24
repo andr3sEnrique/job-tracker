@@ -67,6 +67,7 @@ export const CATEGORY_LABELS: Record<EmailCategory, string> = {
   TECHNICAL_INTERVIEW: 'Entrevista técnica',
   REJECTION: 'Rechazo',
   OFFER: 'Oferta',
+  DATA_CONSENT: 'Conservación de datos',
   JOB_ALERT: 'Alerta de empleo',
   IRRELEVANT: 'Irrelevante',
   UNKNOWN: 'Sin clasificar',

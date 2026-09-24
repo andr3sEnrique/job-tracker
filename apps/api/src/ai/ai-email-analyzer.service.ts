@@ -40,7 +40,7 @@ export class AiEmailAnalyzer {
     return this.llm.enabled;
   }
 
-  /** Stored as `emails.classifier`, e.g. `ai:claude-haiku-4-5@prompt-v1`. */
+  /** Stored as `emails.classifier`, e.g. `ai:claude-haiku-4-5@prompt-v2`. */
   get id(): string {
     return `ai:${this.llm.model}@${PROMPT_VERSION}`;
   }

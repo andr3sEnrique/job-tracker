@@ -3,7 +3,7 @@ import type { Classification, ExtractedData, PreparedEmail } from './types.js';
 export interface Analysis {
   classification: Classification;
   extracted: ExtractedData;
-  /** Stored on the email: which classifier decided (`rules@2`, `ai:…@prompt-v1`). */
+  /** Stored on the email: which classifier decided (`rules@3`, `ai:…@prompt-v2`). */
   classifierId: string;
 }
 

@@ -162,6 +162,7 @@ export const httpApiClient: ApiClient = {
       pageSize: String(query.pageSize),
     });
     if (query.status?.length) params.set('status', query.status.join(','));
+    if (query.category?.length) params.set('category', query.category.join(','));
     return request(`/emails?${params}`, paginatedSchema(emailSummarySchema));
   },
 

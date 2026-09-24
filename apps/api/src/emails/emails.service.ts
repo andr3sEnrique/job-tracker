@@ -138,6 +138,7 @@ export class EmailsService {
       connectionId: connection.id,
       // Discarded mail is not shown unless explicitly requested (it has no metadata anyway).
       processingStatus: query.status?.length ? { in: query.status } : { not: 'SKIPPED' },
+      ...(query.category?.length && { category: { in: query.category } }),
     };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.email.findMany({

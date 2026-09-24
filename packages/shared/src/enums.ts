@@ -68,6 +68,8 @@ export const EMAIL_CATEGORIES = [
   'TECHNICAL_INTERVIEW',
   'REJECTION',
   'OFFER',
+  /** A company asks to keep (or tells it deleted) your data: GDPR consent, talent pool. */
+  'DATA_CONSENT',
   'JOB_ALERT',
   'IRRELEVANT',
   'UNKNOWN',

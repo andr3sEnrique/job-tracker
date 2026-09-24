@@ -279,7 +279,7 @@ export const REGRESSION_CASES: RegressionCase[] = [
     'no-reply@talent-soft.com',
     'Suppression de vos données personnelles',
     'Conformément au RGPD, vos données seront supprimées.',
-    'IRRELEVANT',
+    'DATA_CONSENT',
   ),
   r(
     'fr-candidate-space',
@@ -600,6 +600,37 @@ export const REGRESSION_CASES: RegressionCase[] = [
     'RECRUITER_REPLY',
     null,
     'Software Engineer',
+  ),
+  // Data retention: the company asks to keep your data (not a rejection, no status change)
+  r(
+    'fr-talent-pool-consent',
+    '"Solveo" <no-reply@solveo.teamtailor-mail.com>',
+    'Pouvons-nous vous garder dans notre vivier de talents?',
+    "Votre profil fait partie du vivier de talents de Solveo. Si vous souhaitez prolonger votre autorisation pour que nous conservions vos informations, cliquez sur PROLONGER L'AUTORISATION. Sinon, vos informations seront supprimées sous peu.",
+    'DATA_CONSENT',
+  ),
+  r(
+    'en-keep-candidate-profile',
+    'careers@nordvik-demo.example',
+    "Let's stay in touch! Please Take Action to Keep Your NORDVIK Candidate profile",
+    'To comply with data protection rules, please confirm your consent for us to keep your profile in our talent community.',
+    'DATA_CONSENT',
+  ),
+  r(
+    'es-consentimiento-datos',
+    'empleo@lumen-demo.example',
+    '¿Seguimos en contacto?',
+    'Para seguir teniéndote en cuenta en futuros procesos, necesitamos renovar tu consentimiento para conservar tus datos.',
+    'DATA_CONSENT',
+  ),
+  // …but a rejection that mentions the talent pool is still a rejection.
+  r(
+    'en-rejection-keeps-cv',
+    'no-reply@hire.lever.co',
+    'Your application at Kalm Health',
+    'Unfortunately we have decided not to move forward with your application. We will keep your details in our talent pool.',
+    'REJECTION',
+    'Kalm Health',
   ),
   r(
     'en-role-at-next-steps',
