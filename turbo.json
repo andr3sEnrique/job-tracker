@@ -40,7 +40,8 @@
         "ALLOWED_GOOGLE_EMAILS",
         "COOKIE_SECRET",
         "PORT",
-        "LOG_LEVEL"
+        "LOG_LEVEL",
+        "MAIL_PROVIDER"
       ]
     }
   }

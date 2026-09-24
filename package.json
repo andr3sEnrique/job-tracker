@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "pnpm db:up && pnpm db:migrate && turbo run dev",
     "dev:mock": "NEXT_PUBLIC_API_MODE=mock turbo run dev --filter=@jat/web",
+    "dev:demo": "sh scripts/demo.sh dev",
+    "demo:setup": "sh scripts/demo.sh setup",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

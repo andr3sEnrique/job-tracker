@@ -67,6 +67,8 @@ To work on the UI only, without the API or signing in: `pnpm dev:mock`.
 | ----------------------- | -------------------------------------------------------------------- |
 | `pnpm dev`              | PostgreSQL + migrations + api and web in watch mode                  |
 | `pnpm dev:mock`         | Web only, with in-memory data                                        |
+| `pnpm demo:setup`       | Separate `job_tracker_demo` database with sample applications        |
+| `pnpm dev:demo`         | api + web on the demo database, with a synthetic Gmail inbox         |
 | `pnpm build`            | Production build of the whole workspace                              |
 | `pnpm lint`             | ESLint in every package                                              |
 | `pnpm typecheck`        | `tsc --noEmit` (generates the Prisma client and route types first)   |
