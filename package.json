@@ -26,9 +26,9 @@
     "db:studio": "pnpm --filter @jat/api db:studio"
   },
   "devDependencies": {
-    "prettier": "^3.9.9",
+    "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "turbo": "^2.11.3",
+    "turbo": "^2.11.7",
     "typescript": "~6.0.3"
   }
 }
